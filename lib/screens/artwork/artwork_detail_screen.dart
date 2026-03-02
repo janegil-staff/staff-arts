@@ -1,0 +1,175 @@
+// lib/screens/artwork/artwork_detail_screen.dart
+import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../models/artwork_model.dart';
+import '../../theme/app_theme.dart';
+
+class ArtworkDetailScreen extends StatelessWidget {
+  final ArtworkModel artwork;
+  const ArtworkDetailScreen({super.key, required this.artwork});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('')),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image carousel
+            SizedBox(
+              height: 400,
+              child: PageView.builder(
+                itemCount: artwork.images.length,
+                itemBuilder: (_, i) => CachedNetworkImage(
+                  imageUrl: artwork.images[i].url,
+                  fit: BoxFit.contain,
+                  placeholder: (_, __) => Container(color: AppColors.surfaceDim),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    artwork.title,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text,
+                    ),
+                  ),
+                  if (artwork.artist != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: AppColors.surfaceDim,
+                          backgroundImage: artwork.artist!.avatar != null
+                              ? CachedNetworkImageProvider(artwork.artist!.avatar!)
+                              : null,
+                          child: artwork.artist!.avatar == null
+                              ? Text(
+                                  (artwork.artist!.displayName ?? artwork.artist!.name)[0],
+                                  style: const TextStyle(color: AppColors.teal, fontSize: 14),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          artwork.artist!.displayName ?? artwork.artist!.name,
+                          style: const TextStyle(
+                            fontSize: AppFontSize.md,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.lg),
+                  // Engagement
+                  Row(
+                    children: [
+                      _stat(Icons.favorite, '${artwork.likesCount}', Colors.red[300]!),
+                      const SizedBox(width: 16),
+                      _stat(Icons.visibility, '${artwork.views}', AppColors.textMuted),
+                      const SizedBox(width: 16),
+                      _stat(Icons.comment_outlined, '${artwork.commentsCount}', AppColors.textMuted),
+                    ],
+                  ),
+                  // Price
+                  if (artwork.forSale) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      decoration: BoxDecoration(
+                        color: AppColors.tealBg,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            '\$${artwork.price.toStringAsFixed(2)} ${artwork.currency}',
+                            style: const TextStyle(
+                              fontSize: AppFontSize.xl,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.text,
+                            ),
+                          ),
+                          const Spacer(),
+                          ElevatedButton(
+                            onPressed: () {},
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            child: const Text('Buy Now'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  // Description
+                  if (artwork.description.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      artwork.description,
+                      style: const TextStyle(
+                        fontSize: AppFontSize.md,
+                        color: AppColors.textSecondary,
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                  // Tags
+                  if (artwork.medium.isNotEmpty || artwork.style.isNotEmpty || artwork.tags.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (artwork.medium.isNotEmpty) _tag(artwork.medium),
+                        if (artwork.style.isNotEmpty) _tag(artwork.style),
+                        ...artwork.tags.map((t) => _tag(t)),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _stat(IconData icon, String value, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 4),
+        Text(value, style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.textSecondary)),
+      ],
+    );
+  }
+
+  Widget _tag(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.full),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: AppFontSize.sm,
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
