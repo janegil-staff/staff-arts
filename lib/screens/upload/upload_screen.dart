@@ -5,37 +5,68 @@ import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/artwork_provider.dart';
+import '../../providers/tab_provider.dart';
 import '../../services/api_service.dart';
 import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_chip.dart';
 
 const _categories = [
-  'Painting', 'Sculpture', 'Photography', 'Digital', 'Drawing',
-  'Print', 'Mixed Media', 'Installation', 'Textile', 'Ceramic',
+  'Painting',
+  'Sculpture',
+  'Photography',
+  'Digital',
+  'Drawing',
+  'Print',
+  'Mixed Media',
+  'Installation',
+  'Textile',
+  'Ceramic',
 ];
 
 const _mediums = [
-  'Oil', 'Acrylic', 'Watercolor', 'Charcoal', 'Ink', 'Pastel',
-  'Graphite', 'Digital', 'Photography', 'Bronze', 'Clay', 'Wood',
-  'Mixed Media', 'Other',
+  'Oil',
+  'Acrylic',
+  'Watercolor',
+  'Charcoal',
+  'Ink',
+  'Pastel',
+  'Graphite',
+  'Digital',
+  'Photography',
+  'Bronze',
+  'Clay',
+  'Wood',
+  'Mixed Media',
+  'Other',
 ];
 
 const _styles = [
-  'Abstract', 'Realism', 'Impressionism', 'Minimalism', 'Surrealism',
-  'Pop Art', 'Contemporary', 'Expressionism', 'Cubism', 'Street Art',
-  'Folk Art', 'Figurative', 'Conceptual',
+  'Abstract',
+  'Realism',
+  'Impressionism',
+  'Minimalism',
+  'Surrealism',
+  'Pop Art',
+  'Contemporary',
+  'Expressionism',
+  'Cubism',
+  'Street Art',
+  'Folk Art',
+  'Figurative',
+  'Conceptual',
 ];
 
 const _currencies = [
   {'code': 'USD', 'symbol': '\$', 'label': 'USD (\$)'},
-  {'code': 'EUR', 'symbol': '€', 'label': 'EUR (€)'},
-  {'code': 'GBP', 'symbol': '£', 'label': 'GBP (£)'},
+  {'code': 'EUR', 'symbol': '\u20ac', 'label': 'EUR (\u20ac)'},
+  {'code': 'GBP', 'symbol': '\u00a3', 'label': 'GBP (\u00a3)'},
   {'code': 'NOK', 'symbol': 'kr', 'label': 'NOK (kr)'},
   {'code': 'SEK', 'symbol': 'kr', 'label': 'SEK (kr)'},
   {'code': 'CAD', 'symbol': '\$', 'label': 'CAD (\$)'},
   {'code': 'AUD', 'symbol': '\$', 'label': 'AUD (\$)'},
-  {'code': 'JPY', 'symbol': '¥', 'label': 'JPY (¥)'},
+  {'code': 'JPY', 'symbol': '\u00a5', 'label': 'JPY (\u00a5)'},
   {'code': 'CHF', 'symbol': 'Fr', 'label': 'CHF (Fr)'},
 ];
 
@@ -45,7 +76,13 @@ const _units = [
   {'code': 'mm', 'label': 'mm'},
 ];
 
-const _depthCategories = ['Sculpture', 'Installation', 'Ceramic', 'Mixed Media', 'Textile'];
+const _depthCategories = [
+  'Sculpture',
+  'Installation',
+  'Ceramic',
+  'Mixed Media',
+  'Textile'
+];
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -58,7 +95,6 @@ class _UploadScreenState extends State<UploadScreen> {
   final _api = ApiService();
   final _picker = ImagePicker();
 
-  // Form state
   final List<XFile> _images = [];
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
@@ -73,7 +109,7 @@ class _UploadScreenState extends State<UploadScreen> {
   String _style = '';
   String _dimUnit = 'cm';
   bool _forSale = false;
-  String _currency = 'USD';
+  String _currency = 'NOK';
   bool _uploading = false;
   String _progress = '';
 
@@ -105,7 +141,8 @@ class _UploadScreenState extends State<UploadScreen> {
       return;
     }
     try {
-      final picked = await _picker.pickMultiImage(imageQuality: 80, limit: remaining);
+      final picked =
+          await _picker.pickMultiImage(imageQuality: 80, limit: remaining);
       if (picked.isNotEmpty) {
         setState(() {
           _images.addAll(picked.take(remaining));
@@ -137,7 +174,8 @@ class _UploadScreenState extends State<UploadScreen> {
   Future<void> _submit() async {
     final title = _titleController.text.trim();
     if (title.isEmpty) return _showAlert('Required', 'Enter a title');
-    if (_images.isEmpty) return _showAlert('Required', 'Add at least one image');
+    if (_images.isEmpty)
+      return _showAlert('Required', 'Add at least one image');
     if (_forSale) {
       final price = double.tryParse(_priceController.text);
       if (price == null) return _showAlert('Required', 'Enter a valid price');
@@ -149,10 +187,10 @@ class _UploadScreenState extends State<UploadScreen> {
     });
 
     try {
-      // 1. Upload images to Cloudinary via backend
       final uploadedImages = <Map<String, dynamic>>[];
       for (var i = 0; i < _images.length; i++) {
-        setState(() => _progress = 'Uploading image ${i + 1} of ${_images.length}...');
+        setState(() =>
+            _progress = 'Uploading image ${i + 1} of ${_images.length}...');
 
         final file = _images[i];
         final formData = FormData.fromMap({
@@ -170,7 +208,6 @@ class _UploadScreenState extends State<UploadScreen> {
         });
       }
 
-      // 2. Create artwork
       setState(() => _progress = 'Saving artwork...');
 
       final yearText = _yearController.text.trim();
@@ -188,11 +225,22 @@ class _UploadScreenState extends State<UploadScreen> {
         'currency': _currency,
       });
 
-      // 3. Reset form
       _resetForm();
 
       if (!mounted) return;
-      _showAlert('Success', 'Artwork uploaded!');
+
+      // Refresh artworks and navigate to Home tab
+      context.read<ArtworkProvider>().fetchArtworks(refresh: true);
+      context.read<ArtworkProvider>().fetchFeatured();
+      context.read<TabProvider>().requestArtworkRefresh();
+      context.read<TabProvider>().switchToTab(0);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Artwork uploaded!'),
+          backgroundColor: AppColors.teal,
+        ),
+      );
     } catch (e) {
       debugPrint('Upload error: $e');
       if (!mounted) return;
@@ -224,7 +272,7 @@ class _UploadScreenState extends State<UploadScreen> {
       _style = '';
       _dimUnit = 'cm';
       _forSale = false;
-      _currency = 'USD';
+      _currency = 'NOK';
     });
   }
 
@@ -234,7 +282,8 @@ class _UploadScreenState extends State<UploadScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
         title: Text(title, style: const TextStyle(color: AppColors.text)),
-        content: Text(message, style: const TextStyle(color: AppColors.textSecondary)),
+        content: Text(message,
+            style: const TextStyle(color: AppColors.textSecondary)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -250,17 +299,19 @@ class _UploadScreenState extends State<UploadScreen> {
     final user = context.watch<AuthProvider>().user;
     if (user == null) {
       return const Center(
-        child: Text('Sign in to upload artwork', style: TextStyle(color: AppColors.textMuted)),
+        child: Text('Sign in to upload artwork',
+            style: TextStyle(color: AppColors.textMuted)),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Text('✕', style: TextStyle(fontSize: 20, color: AppColors.textSecondary)),
+          icon: const Icon(Icons.close, color: AppColors.textSecondary),
           onPressed: () => Navigator.maybePop(context),
         ),
-        title: const Text('New Artwork', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('New Artwork',
+            style: TextStyle(fontWeight: FontWeight.w700)),
         centerTitle: true,
       ),
       body: GestureDetector(
@@ -269,14 +320,12 @@ class _UploadScreenState extends State<UploadScreen> {
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
-            // ── Images ──
             _label('Images'),
             SizedBox(
               height: 100,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  // Add button
                   GestureDetector(
                     onTap: _pickImages,
                     child: Container(
@@ -289,14 +338,17 @@ class _UploadScreenState extends State<UploadScreen> {
                       child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('+', style: TextStyle(fontSize: 28, color: AppColors.teal)),
+                          Text('+',
+                              style: TextStyle(
+                                  fontSize: 28, color: AppColors.teal)),
                           SizedBox(height: 2),
-                          Text('Add', style: TextStyle(fontSize: 12, color: AppColors.teal)),
+                          Text('Add',
+                              style: TextStyle(
+                                  fontSize: 12, color: AppColors.teal)),
                         ],
                       ),
                     ),
                   ),
-                  // Thumbnails
                   ..._images.asMap().entries.map((entry) {
                     final i = entry.key;
                     final img = entry.value;
@@ -306,7 +358,8 @@ class _UploadScreenState extends State<UploadScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(AppRadius.md),
-                            child: Image.file(File(img.path), width: 100, height: 100, fit: BoxFit.cover),
+                            child: Image.file(File(img.path),
+                                width: 100, height: 100, fit: BoxFit.cover),
                           ),
                           Positioned(
                             top: 4,
@@ -316,10 +369,11 @@ class _UploadScreenState extends State<UploadScreen> {
                               child: Container(
                                 width: 22,
                                 height: 22,
-                                decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.error),
-                                child: const Center(
-                                  child: Text('✕', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                                ),
+                                decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppColors.error),
+                                child: const Icon(Icons.close,
+                                    color: Colors.white, size: 14),
                               ),
                             ),
                           ),
@@ -330,36 +384,27 @@ class _UploadScreenState extends State<UploadScreen> {
                 ],
               ),
             ),
-
-            // ── Title ──
             _label('Title'),
             _input(_titleController, 'Artwork title'),
-
-            // ── Description ──
             _label('Description'),
             _input(_descController, 'Tell us about this piece...', maxLines: 4),
-
-            // ── Year ──
             _label('Year'),
             _input(_yearController, '2025', keyboardType: TextInputType.number),
-
-            // ── Category ──
             _label('Category'),
-            _chipRow(_categories, _category, (v) => setState(() => _category = _category == v ? '' : v)),
-
-            // ── Medium ──
+            _chipRow(_categories, _category,
+                (v) => setState(() => _category = _category == v ? '' : v)),
             _label('Medium'),
-            _chipRow(_mediums, _medium, (v) => setState(() => _medium = _medium == v ? '' : v)),
-
-            // ── Style ──
+            _chipRow(_mediums, _medium,
+                (v) => setState(() => _medium = _medium == v ? '' : v)),
             _label('Style'),
-            _chipRow(_styles, _style, (v) => setState(() => _style = _style == v ? '' : v)),
-
-            // ── Dimensions ──
+            _chipRow(_styles, _style,
+                (v) => setState(() => _style = _style == v ? '' : v)),
             _label('Dimensions'),
             const Padding(
               padding: EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Text('Optional — helps collectors assess the piece', style: TextStyle(fontSize: AppFontSize.xs, color: AppColors.textMuted)),
+              child: Text('Optional — helps collectors assess the piece',
+                  style: TextStyle(
+                      fontSize: AppFontSize.xs, color: AppColors.textMuted)),
             ),
             _chipRow(
               _units.map((u) => u['label']!).toList(),
@@ -376,20 +421,26 @@ class _UploadScreenState extends State<UploadScreen> {
                 _dimField('H', _heightController),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 6),
-                  child: Text('×', style: TextStyle(fontSize: 16, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
+                  child: Text('\u00d7',
+                      style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textMuted,
+                          fontWeight: FontWeight.w500)),
                 ),
                 _dimField('W', _widthController),
                 if (_showDepth) ...[
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 6),
-                    child: Text('×', style: TextStyle(fontSize: 16, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
+                    child: Text('\u00d7',
+                        style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w500)),
                   ),
                   _dimField('D', _depthController),
                 ],
               ],
             ),
-
-            // ── For Sale ──
             const SizedBox(height: AppSpacing.md),
             Container(
               padding: const EdgeInsets.all(AppSpacing.md),
@@ -404,9 +455,16 @@ class _UploadScreenState extends State<UploadScreen> {
                   const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('List for sale', style: TextStyle(fontSize: AppFontSize.md, color: AppColors.text, fontWeight: FontWeight.w500)),
+                      Text('List for sale',
+                          style: TextStyle(
+                              fontSize: AppFontSize.md,
+                              color: AppColors.text,
+                              fontWeight: FontWeight.w500)),
                       SizedBox(height: 2),
-                      Text('Set a price for collectors', style: TextStyle(fontSize: AppFontSize.xs, color: AppColors.textMuted)),
+                      Text('Set a price for collectors',
+                          style: TextStyle(
+                              fontSize: AppFontSize.xs,
+                              color: AppColors.textMuted)),
                     ],
                   ),
                   Switch(
@@ -420,15 +478,14 @@ class _UploadScreenState extends State<UploadScreen> {
                 ],
               ),
             ),
-
-            // ── Sale Fields ──
             if (_forSale) ...[
               _label('Currency'),
               _chipRow(
                 _currencies.map((c) => c['label']!).toList(),
                 _activeCurrency['label']!,
                 (label) {
-                  final cur = _currencies.firstWhere((c) => c['label'] == label);
+                  final cur =
+                      _currencies.firstWhere((c) => c['label'] == label);
                   setState(() => _currency = cur['code']!);
                 },
               ),
@@ -442,41 +499,61 @@ class _UploadScreenState extends State<UploadScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 child: Row(
                   children: [
-                    Text(_activeCurrency['symbol']!, style: const TextStyle(fontSize: AppFontSize.lg, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                    Text(_activeCurrency['symbol']!,
+                        style: const TextStyle(
+                            fontSize: AppFontSize.lg,
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w600)),
                     const SizedBox(width: 4),
                     Expanded(
                       child: TextField(
                         controller: _priceController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        style: const TextStyle(color: AppColors.text, fontSize: AppFontSize.md),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        style: const TextStyle(
+                            color: AppColors.text, fontSize: AppFontSize.md),
                         decoration: const InputDecoration(
                           hintText: '0.00',
-                          border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
-                          fillColor: Colors.transparent, filled: true,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          fillColor: Colors.transparent,
+                          filled: true,
                           contentPadding: EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ),
-                    Text(_currency, style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
+                    Text(_currency,
+                        style: const TextStyle(
+                            fontSize: AppFontSize.sm,
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
             ],
-
-            // ── Submit ──
             const SizedBox(height: AppSpacing.lg),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _uploading ? null : _submit,
-                style: ElevatedButton.styleFrom(disabledBackgroundColor: AppColors.teal.withValues(alpha: 0.6)),
+                style: ElevatedButton.styleFrom(
+                    disabledBackgroundColor:
+                        AppColors.teal.withValues(alpha: 0.6)),
                 child: _uploading
                     ? Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textInverse)),
+                          const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.textInverse)),
                           const SizedBox(width: AppSpacing.sm),
-                          Text(_progress.isNotEmpty ? _progress : 'Uploading...'),
+                          Text(_progress.isNotEmpty
+                              ? _progress
+                              : 'Uploading...'),
                         ],
                       )
                     : const Text('Upload Artwork'),
@@ -489,16 +566,19 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
-  // ── Helper Widgets ──
-
   Widget _label(String text) {
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
-      child: Text(text, style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+      child: Text(text,
+          style: const TextStyle(
+              fontSize: AppFontSize.sm,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500)),
     );
   }
 
-  Widget _input(TextEditingController controller, String hint, {int maxLines = 1, TextInputType? keyboardType}) {
+  Widget _input(TextEditingController controller, String hint,
+      {int maxLines = 1, TextInputType? keyboardType}) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
@@ -508,7 +588,9 @@ class _UploadScreenState extends State<UploadScreen> {
     );
   }
 
-  Widget _chipRow(List<String> items, String selected, void Function(String) onTap, {bool small = false}) {
+  Widget _chipRow(
+      List<String> items, String selected, void Function(String) onTap,
+      {bool small = false}) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -516,7 +598,11 @@ class _UploadScreenState extends State<UploadScreen> {
         children: items.map((item) {
           return Padding(
             padding: const EdgeInsets.only(right: AppSpacing.sm),
-            child: AppChip(label: item, active: selected == item, onTap: () => onTap(item), small: small),
+            child: AppChip(
+                label: item,
+                active: selected == item,
+                onTap: () => onTap(item),
+                small: small),
           );
         }).toList(),
       ),
@@ -534,21 +620,35 @@ class _UploadScreenState extends State<UploadScreen> {
         ),
         child: Row(
           children: [
-            Text(label, style: const TextStyle(fontSize: AppFontSize.xs, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: AppFontSize.xs,
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w700)),
             const SizedBox(width: 4),
             Expanded(
               child: TextField(
                 controller: controller,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.text, fontSize: AppFontSize.md),
+                style: const TextStyle(
+                    color: AppColors.text, fontSize: AppFontSize.md),
                 decoration: const InputDecoration(
-                  hintText: '0', border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none,
-                  fillColor: Colors.transparent, filled: true, isDense: true, contentPadding: EdgeInsets.zero,
+                  hintText: '0',
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  fillColor: Colors.transparent,
+                  filled: true,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
                 ),
               ),
             ),
-            Text(_dimUnit, style: const TextStyle(fontSize: AppFontSize.xs, color: AppColors.textMuted)),
+            Text(_dimUnit,
+                style: const TextStyle(
+                    fontSize: AppFontSize.xs, color: AppColors.textMuted)),
           ],
         ),
       ),

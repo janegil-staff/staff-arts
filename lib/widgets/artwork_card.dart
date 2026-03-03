@@ -4,6 +4,21 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/artwork_model.dart';
 import '../theme/app_theme.dart';
 
+String _currencySymbol(String code) {
+  const symbols = {
+    'USD': '\$',
+    'EUR': '\u20ac',
+    'GBP': '\u00a3',
+    'NOK': 'kr',
+    'SEK': 'kr',
+    'CAD': 'CA\$',
+    'AUD': 'A\$',
+    'JPY': '\u00a5',
+    'CHF': 'Fr',
+  };
+  return symbols[code] ?? code;
+}
+
 class ArtworkCard extends StatelessWidget {
   final ArtworkModel artwork;
   final VoidCallback? onTap;
@@ -32,7 +47,8 @@ class ArtworkCard extends StatelessWidget {
                 child: CachedNetworkImage(
                   imageUrl: artwork.mainImageUrl,
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(color: AppColors.surfaceDim),
+                  placeholder: (_, __) =>
+                      Container(color: AppColors.surfaceDim),
                   errorWidget: (_, __, ___) => Container(
                     color: AppColors.surfaceDim,
                     child: const Icon(Icons.image_not_supported,
@@ -67,7 +83,7 @@ class ArtworkCard extends StatelessWidget {
             if (artwork.forSale && artwork.price > 0) ...[
               const SizedBox(height: 2),
               Text(
-                '\$${artwork.price.toStringAsFixed(0)}',
+                '${_currencySymbol(artwork.currency)} ${artwork.price.toStringAsFixed(0)}',
                 style: const TextStyle(
                   fontSize: AppFontSize.sm,
                   fontWeight: FontWeight.w700,
@@ -169,7 +185,7 @@ class FeaturedArtworkCard extends StatelessWidget {
                   bottom: AppSpacing.md,
                 ),
                 child: Text(
-                  '\$${artwork.price.toStringAsFixed(0)}',
+                  '${_currencySymbol(artwork.currency)} ${artwork.price.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: AppFontSize.sm,
                     fontWeight: FontWeight.w700,

@@ -4,6 +4,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/artwork_model.dart';
 import '../../theme/app_theme.dart';
 
+String _currencySymbol(String code) {
+  const symbols = {
+    'USD': '\$', 'EUR': '\u20ac', 'GBP': '\u00a3', 'NOK': 'kr',
+    'SEK': 'kr', 'CAD': 'CA\$', 'AUD': 'A\$', 'JPY': '\u00a5', 'CHF': 'Fr',
+  };
+  return symbols[code] ?? code;
+}
+
 class ArtworkDetailScreen extends StatelessWidget {
   final ArtworkModel artwork;
   const ArtworkDetailScreen({super.key, required this.artwork});
@@ -92,7 +100,7 @@ class ArtworkDetailScreen extends StatelessWidget {
                       child: Row(
                         children: [
                           Text(
-                            '\$${artwork.price.toStringAsFixed(2)} ${artwork.currency}',
+                            '${_currencySymbol(artwork.currency)} ${artwork.price.toStringAsFixed(0)}',
                             style: const TextStyle(
                               fontSize: AppFontSize.xl,
                               fontWeight: FontWeight.w700,

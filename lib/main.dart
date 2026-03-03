@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/artwork_provider.dart';
+import 'providers/tab_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
@@ -34,6 +35,7 @@ class StaffArtApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..checkAuth()),
         ChangeNotifierProvider(create: (_) => ArtworkProvider()),
+        ChangeNotifierProvider(create: (_) => TabProvider()),
       ],
       child: MaterialApp(
         title: 'Staff Art',
@@ -60,12 +62,17 @@ class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  State<MainShell> createState() => MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class MainShellState extends State<MainShell> {
   int _currentIndex = 0;
   int? _pendingAuthTab;
+
+  /// Public method so child screens (e.g. UploadScreen) can switch tabs
+  void switchToTab(int index) {
+    setState(() => _currentIndex = index);
+  }
 
   final _labels = const ['Home', 'Explore', '', 'Shows', 'Profile'];
   final _icons = const ['\u{1F3E0}', '\u{1F50D}', '+', '\u{1F3AD}', '\u{1F464}'];
@@ -74,6 +81,8 @@ class _MainShellState extends State<MainShell> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final auth = context.watch<AuthProvider>();
+    final tabProvider = context.watch<TabProvider>();
+
     // If user just authenticated and we had a pending tab, navigate there
     if (auth.isAuthenticated && _pendingAuthTab != null) {
       final tab = _pendingAuthTab!;
@@ -81,6 +90,21 @@ class _MainShellState extends State<MainShell> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _currentIndex = tab);
       });
+    }
+
+    // If another screen requested a tab switch (e.g. upload -> home)
+    if (tabProvider.currentIndex != _currentIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _currentIndex = tabProvider.currentIndex);
+      });
+    }
+
+    // If artworks need refreshing (e.g. after upload)
+    if (tabProvider.shouldRefreshArtworks) {
+      tabProvider.clearRefreshFlag();
+      final artworkProvider = context.read<ArtworkProvider>();
+      artworkProvider.fetchArtworks(refresh: true);
+      artworkProvider.fetchFeatured();
     }
   }
 
@@ -102,6 +126,8 @@ class _MainShellState extends State<MainShell> {
     }
 
     setState(() => _currentIndex = index);
+    // Keep TabProvider in sync so other screens know the current tab
+    context.read<TabProvider>().switchToTab(index);
   }
 
   void _pushAuthScreen() {
