@@ -33,7 +33,10 @@ class _LoginScreenState extends State<LoginScreen> {
       _passwordController.text,
     );
     if (!mounted) return;
-    if (!success && auth.error != null) {
+    if (success) {
+      // Pop back to MainShell — it already reacts to auth state
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else if (auth.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(auth.error!),
@@ -69,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     text: const TextSpan(
                       children: [
                         TextSpan(
-                          text: 'STAFF ',
+                          text: "STAFF ",
                           style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w300,
@@ -78,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         TextSpan(
-                          text: 'Arts',
+                          text: "Arts",
                           style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w300,
@@ -91,7 +94,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Welcome back',
+                    "Welcome back",
                     style: TextStyle(
                       fontSize: AppFontSize.md,
                       color: AppColors.textMuted,
@@ -104,11 +107,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     textInputAction: TextInputAction.next,
                     style: const TextStyle(color: AppColors.text),
                     decoration: const InputDecoration(
-                      hintText: 'Email',
+                      hintText: "Email",
                       prefixIcon: Icon(Icons.email_outlined, color: AppColors.textMuted),
                     ),
                     validator: (v) =>
-                        v != null && v.contains('@') ? null : 'Enter a valid email',
+                        v != null && v.contains("@") ? null : "Enter a valid email",
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -118,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     onFieldSubmitted: (_) => _submit(),
                     style: const TextStyle(color: AppColors.text),
                     decoration: InputDecoration(
-                      hintText: 'Password',
+                      hintText: "Password",
                       prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.textMuted),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -129,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     validator: (v) =>
-                        v != null && v.length >= 8 ? null : 'Min 8 characters',
+                        v != null && v.length >= 8 ? null : "Min 8 characters",
                   ),
                   const SizedBox(height: 28),
                   SizedBox(
@@ -145,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: AppColors.textInverse,
                               ),
                             )
-                          : const Text('Sign In'),
+                          : const Text("Sign In"),
                     ),
                   ),
                   const SizedBox(height: 16),

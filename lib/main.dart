@@ -41,7 +41,6 @@ class StaffArtApp extends StatelessWidget {
         theme: appTheme(),
         home: Consumer<AuthProvider>(
           builder: (context, auth, _) {
-            // Show loading only on initial check
             if (auth.state == AuthState.initial) {
               return const Scaffold(
                 body: Center(
@@ -49,7 +48,6 @@ class StaffArtApp extends StatelessWidget {
                 ),
               );
             }
-            // Always show main shell — auth is checked per-tab
             return const MainShell();
           },
         ),
@@ -58,8 +56,6 @@ class StaffArtApp extends StatelessWidget {
   }
 }
 
-// ── Main Shell with Bottom Tabs ──
-// Everyone sees all tabs. Upload and Profile are auth-gated.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -69,23 +65,38 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  int? _pendingAuthTab;
 
   final _labels = const ['Home', 'Explore', '', 'Shows', 'Profile'];
-  final _icons = const ['🏠', '🔍', '+', '🎭', '👤'];
+  final _icons = const ['\u{1F3E0}', '\u{1F50D}', '+', '\u{1F3AD}', '\u{1F464}'];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final auth = context.watch<AuthProvider>();
+    // If user just authenticated and we had a pending tab, navigate there
+    if (auth.isAuthenticated && _pendingAuthTab != null) {
+      final tab = _pendingAuthTab!;
+      _pendingAuthTab = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _currentIndex = tab);
+      });
+    }
+  }
 
   void _onTabTapped(int index) {
     final auth = context.read<AuthProvider>();
 
-    // Upload tab (index 2) — requires auth
     if (index == 2) {
       if (!auth.isAuthenticated) {
+        _pendingAuthTab = index;
         _pushAuthScreen();
         return;
       }
     }
 
-    // Profile tab (index 4) — show login if not authenticated
     if (index == 4 && !auth.isAuthenticated) {
+      _pendingAuthTab = index;
       _pushAuthScreen();
       return;
     }
@@ -121,7 +132,6 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
-    // If user just logged out while on Profile/Upload, bounce to Home
     if (!auth.isAuthenticated && (_currentIndex == 2 || _currentIndex == 4)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _currentIndex = 0);
@@ -168,7 +178,7 @@ class _MainShellState extends State<MainShell> {
           ),
           actions: [
             IconButton(
-              icon: const Text('💬', style: TextStyle(fontSize: 22)),
+              icon: const Text('\u{1F4AC}', style: TextStyle(fontSize: 22)),
               onPressed: () {
                 if (!auth.isAuthenticated) {
                   _pushAuthScreen();
