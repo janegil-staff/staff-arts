@@ -8,8 +8,10 @@ class ShowsService {
   Future<List<dynamic>> fetchEvents() async {
     try {
       final res = await _api.get(ApiConfig.events);
-      final data = res.data as Map<String, dynamic>;
-      return (data['events'] ?? data['data']?['events'] ?? []) as List<dynamic>;
+      final body = res.data as Map<String, dynamic>;
+      if (body['success'] != true) return [];
+      // ✅ data is the list directly — { success: true, data: [...] }
+      return (body['data'] as List<dynamic>? ?? []);
     } catch (e) {
       print('Shows events error: $e');
       return [];
@@ -19,9 +21,10 @@ class ShowsService {
   Future<List<dynamic>> fetchExhibitions() async {
     try {
       final res = await _api.get(ApiConfig.exhibitions);
-      final data = res.data as Map<String, dynamic>;
-      return (data['exhibitions'] ?? data['data']?['exhibitions'] ?? [])
-          as List<dynamic>;
+      final body = res.data as Map<String, dynamic>;
+      if (body['success'] != true) return [];
+      // ✅ same fix
+      return (body['data'] as List<dynamic>? ?? []);
     } catch (e) {
       print('Shows exhibitions error: $e');
       return [];

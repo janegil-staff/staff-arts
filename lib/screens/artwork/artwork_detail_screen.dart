@@ -6,8 +6,15 @@ import '../../theme/app_theme.dart';
 
 String _currencySymbol(String code) {
   const symbols = {
-    'USD': '\$', 'EUR': '\u20ac', 'GBP': '\u00a3', 'NOK': 'kr',
-    'SEK': 'kr', 'CAD': 'CA\$', 'AUD': 'A\$', 'JPY': '\u00a5', 'CHF': 'Fr',
+    'USD': '\$',
+    'EUR': '\u20ac',
+    'GBP': '\u00a3',
+    'NOK': 'kr',
+    'SEK': 'kr',
+    'CAD': 'CA\$',
+    'AUD': 'A\$',
+    'JPY': '\u00a5',
+    'CHF': 'Fr',
   };
   return symbols[code] ?? code;
 }
@@ -32,7 +39,8 @@ class ArtworkDetailScreen extends StatelessWidget {
                 itemBuilder: (_, i) => CachedNetworkImage(
                   imageUrl: artwork.images[i].url,
                   fit: BoxFit.contain,
-                  placeholder: (_, __) => Container(color: AppColors.surfaceDim),
+                  placeholder: (_, __) =>
+                      Container(color: AppColors.surfaceDim),
                 ),
               ),
             ),
@@ -57,18 +65,23 @@ class ArtworkDetailScreen extends StatelessWidget {
                           radius: 16,
                           backgroundColor: AppColors.surfaceDim,
                           backgroundImage: artwork.artist!.avatar != null
-                              ? CachedNetworkImageProvider(artwork.artist!.avatar!)
+                              ? CachedNetworkImageProvider(
+                                  artwork.artist!.avatar!)
                               : null,
                           child: artwork.artist!.avatar == null
                               ? Text(
-                                  (artwork.artist!.displayName ?? artwork.artist!.name)[0],
-                                  style: const TextStyle(color: AppColors.teal, fontSize: 14),
+                                  // ✅ safe: displayLabel is never null
+                                  artwork.artist!.displayLabel.isNotEmpty
+                                      ? artwork.artist!.displayLabel[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                      color: AppColors.teal, fontSize: 14),
                                 )
                               : null,
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          artwork.artist!.displayName ?? artwork.artist!.name,
+                          artwork.artist!.displayLabel, // ✅ never null
                           style: const TextStyle(
                             fontSize: AppFontSize.md,
                             color: AppColors.textSecondary,
@@ -81,11 +94,14 @@ class ArtworkDetailScreen extends StatelessWidget {
                   // Engagement
                   Row(
                     children: [
-                      _stat(Icons.favorite, '${artwork.likesCount}', Colors.red[300]!),
+                      _stat(Icons.favorite, '${artwork.likesCount}',
+                          Colors.red[300]!),
                       const SizedBox(width: 16),
-                      _stat(Icons.visibility, '${artwork.views}', AppColors.textMuted),
+                      _stat(Icons.visibility, '${artwork.views}',
+                          AppColors.textMuted),
                       const SizedBox(width: 16),
-                      _stat(Icons.comment_outlined, '${artwork.commentsCount}', AppColors.textMuted),
+                      _stat(Icons.comment_outlined, '${artwork.commentsCount}',
+                          AppColors.textMuted),
                     ],
                   ),
                   // Price
@@ -111,7 +127,8 @@ class ArtworkDetailScreen extends StatelessWidget {
                           ElevatedButton(
                             onPressed: () {},
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 12),
                             ),
                             child: const Text('Buy Now'),
                           ),
@@ -132,7 +149,9 @@ class ArtworkDetailScreen extends StatelessWidget {
                     ),
                   ],
                   // Tags
-                  if (artwork.medium.isNotEmpty || artwork.style.isNotEmpty || artwork.tags.isNotEmpty) ...[
+                  if (artwork.medium.isNotEmpty ||
+                      artwork.style.isNotEmpty ||
+                      artwork.tags.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.lg),
                     Wrap(
                       spacing: 8,
@@ -158,7 +177,9 @@ class ArtworkDetailScreen extends StatelessWidget {
       children: [
         Icon(icon, size: 18, color: color),
         const SizedBox(width: 4),
-        Text(value, style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.textSecondary)),
+        Text(value,
+            style: const TextStyle(
+                fontSize: AppFontSize.sm, color: AppColors.textSecondary)),
       ],
     );
   }

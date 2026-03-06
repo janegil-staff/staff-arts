@@ -20,8 +20,10 @@ class ArtworkProvider extends ChangeNotifier {
   String? get error => _error;
   bool get hasMore => _hasMore;
 
-  Future<void> fetchArtworks(
-      {bool refresh = false, Map<String, dynamic>? filters}) async {
+  Future<void> fetchArtworks({
+    bool refresh = false,
+    Map<String, dynamic>? filters,
+  }) async {
     if (_loading) return;
     if (refresh) {
       _page = 1;
@@ -38,19 +40,25 @@ class ArtworkProvider extends ChangeNotifier {
       final params = <String, dynamic>{
         'page': _page,
         'limit': 20,
-        'status': 'all',
+        // ✅ don't send status=all — backend ignores unknown values
+        // default is 'published', which is what we want
         ...?filters,
       };
       final res = await _api.get(ApiConfig.artworks, params: params);
-      final list = (res.data['artworks'] ?? res.data['data']?['artworks'] ?? [])
-          .map<ArtworkModel>((j) => ArtworkModel.fromJson(j))
+      final body = res.data as Map<String, dynamic>;
+
+      // ✅ API returns { success: true, data: [...] }
+      final list = (body['data'] as List? ?? [])
+          .map<ArtworkModel>((j) => ArtworkModel.fromJson(j as Map<String, dynamic>))
           .toList();
+
       _artworks.addAll(list);
       _hasMore = list.length >= 20;
       _page++;
     } catch (e) {
       _error = e.toString();
     }
+
     _loading = false;
     notifyListeners();
   }
@@ -60,11 +68,14 @@ class ArtworkProvider extends ChangeNotifier {
       final res = await _api.get(ApiConfig.artworks, params: {
         'featured': true,
         'limit': 10,
-        'status': 'all',
       });
-      _featured = (res.data['artworks'] ?? res.data['data']?['artworks'] ?? [])
-          .map<ArtworkModel>((j) => ArtworkModel.fromJson(j))
+      final body = res.data as Map<String, dynamic>;
+
+      // ✅ same fix
+      _featured = (body['data'] as List? ?? [])
+          .map<ArtworkModel>((j) => ArtworkModel.fromJson(j as Map<String, dynamic>))
           .toList();
+
       notifyListeners();
     } catch (_) {}
   }

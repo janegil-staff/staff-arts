@@ -71,7 +71,7 @@ class ArtworkCard extends StatelessWidget {
             if (artwork.artist != null) ...[
               const SizedBox(height: 2),
               Text(
-                artwork.artist!.displayName ?? artwork.artist!.name,
+                artwork.artist!.displayLabel, // ✅ never null
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -165,7 +165,7 @@ class FeaturedArtworkCard extends StatelessWidget {
                   if (artwork.artist != null) ...[
                     const SizedBox(height: 2),
                     Text(
-                      artwork.artist!.displayName ?? artwork.artist!.name,
+                      artwork.artist!.displayLabel, // ✅ never null
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

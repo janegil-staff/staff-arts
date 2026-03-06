@@ -22,7 +22,6 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> checkAuth() async {
     final token = await _apiService.getToken();
-    print('TOKEN: $token'); // debug
     if (token == null) {
       _state = AuthState.unauthenticated;
       notifyListeners();
@@ -30,10 +29,8 @@ class AuthProvider extends ChangeNotifier {
     }
     try {
       _user = await _authService.getMe();
-      print('USER: ${_user?.email}'); // debug
       _state = AuthState.authenticated;
     } catch (e) {
-      print('AUTH CHECK FAILED: $e'); // debug
       _state = AuthState.unauthenticated;
       await _apiService.clearTokens();
     }

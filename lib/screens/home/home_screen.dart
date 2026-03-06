@@ -1,13 +1,17 @@
 // lib/screens/home/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/artwork_provider.dart';
+import '../../services/api_service.dart';
+import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/artwork_card.dart';
 import '../../widgets/section_header.dart';
 import '../artwork/artwork_detail_screen.dart';
+import '../shows/event_detail_screen.dart';
+import '../shows/exhibition_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,24 +21,123 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _refreshing = false;
+  final ApiService _api = ApiService();
+  List<Map<String, dynamic>> _upcoming = [];
 
   @override
   void initState() {
     super.initState();
-    final provider = context.read<ArtworkProvider>();
-    provider.fetchFeatured();
-    provider.fetchArtworks(refresh: true);
+    _fetchUpcoming();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ArtworkProvider>().fetchArtworks(refresh: true);
+    });
+  }
+
+  Future<void> _fetchUpcoming() async {
+    final items = <Map<String, dynamic>>[];
+    final now = DateTime.now();
+
+    // Fetch events
+    try {
+      final res = await _api
+          .get(ApiConfig.events, params: {'limit': '10', 'sort': 'date'});
+      final body = res.data as Map<String, dynamic>;
+      // ✅ data is the list directly
+      final list = (body['data'] as List<dynamic>? ?? []);
+      for (final j in list) {
+        if (j is! Map) continue;
+        final m = Map<String, dynamic>.from(j);
+        final d = DateTime.tryParse(m['date']?.toString() ?? '');
+        if (d != null && d.isAfter(now)) {
+          final cover = m['coverImage'];
+          m['_imageUrl'] =
+              (cover is Map) ? (cover['url']?.toString() ?? '') : '';
+          m['_date'] = d;
+          m['_kind'] = 'event';
+          m['_badge'] = _eventLabel(m['type']?.toString() ?? 'other');
+          items.add(m);
+        }
+      }
+    } catch (e) {
+      debugPrint('Events error: $e');
+    }
+
+    // Fetch exhibitions
+    try {
+      final res =
+          await _api.get(ApiConfig.exhibitions, params: {'limit': '10'});
+      final body = res.data as Map<String, dynamic>;
+      // ✅ data is the list directly
+      final list = (body['data'] as List<dynamic>? ?? []);
+      for (final j in list) {
+        if (j is! Map) continue;
+        final m = Map<String, dynamic>.from(j);
+        final d = DateTime.tryParse(m['startDate']?.toString() ?? '');
+        if (d != null && d.isAfter(now)) {
+          final cover = m['coverImage'];
+          m['_imageUrl'] = (cover is Map)
+              ? (cover['url']?.toString() ?? '')
+              : (cover is String ? cover : '');
+          m['_date'] = d;
+          m['_kind'] = 'exhibition';
+          m['_badge'] = 'Exhibition';
+          items.add(m);
+        }
+      }
+    } catch (e) {
+      debugPrint('Exhibitions error: $e');
+    }
+
+    // Sort by date ascending (nearest first), take 3
+    items.sort(
+        (a, b) => (a['_date'] as DateTime).compareTo(b['_date'] as DateTime));
+
+    if (mounted) {
+      setState(() => _upcoming = items.take(3).toList());
+    }
+  }
+
+  String _eventLabel(String type) {
+    const m = {
+      'opening': 'Opening',
+      'workshop': 'Workshop',
+      'talk': 'Talk',
+      'fair': 'Art Fair',
+      'concert': 'Concert',
+      'dj_set': 'DJ Set',
+      'live_performance': 'Live',
+      'open_mic': 'Open Mic',
+      'festival': 'Festival',
+      'album_release': 'Release',
+    };
+    return m[type] ?? 'Event';
   }
 
   Future<void> _onRefresh() async {
-    setState(() => _refreshing = true);
-    final provider = context.read<ArtworkProvider>();
     await Future.wait([
-      provider.fetchFeatured(),
-      provider.fetchArtworks(refresh: true),
+      context.read<ArtworkProvider>().fetchArtworks(refresh: true),
+      _fetchUpcoming(),
     ]);
-    setState(() => _refreshing = false);
+  }
+
+  void _onUpcomingTap(Map<String, dynamic> item) {
+    final kind = item['_kind'];
+    final id = item['_id']?.toString() ?? '';
+    if (id.isEmpty) return;
+
+    if (kind == 'event') {
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EventDetailScreen(id: id),
+          ));
+    } else if (kind == 'exhibition') {
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ExhibitionDetailScreen(id: id),
+          ));
+    }
   }
 
   @override
@@ -42,7 +145,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = context.watch<AuthProvider>().user;
     final provider = context.watch<ArtworkProvider>();
     final screenWidth = MediaQuery.of(context).size.width;
-    final featuredCardWidth = screenWidth * 0.72;
 
     final hour = DateTime.now().hour;
     final greeting = hour < 12
@@ -50,7 +152,6 @@ class _HomeScreenState extends State<HomeScreen> {
         : hour < 18
             ? 'Good afternoon'
             : 'Good evening';
-
     final firstName = user?.name?.split(' ').first ?? 'there';
 
     return RefreshIndicator(
@@ -90,42 +191,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // ── Curated (Featured) ──
-          if (provider.featured.isNotEmpty) ...[
-            SectionHeader(
-              label: 'Curated',
-              actionText: 'See all',
-              onAction: () {
-                // Navigate to Explore tab
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              height: featuredCardWidth * 1.15 + 80,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.only(left: AppSpacing.lg),
-                physics: const BouncingScrollPhysics(),
-                itemCount: provider.featured.length,
-                itemBuilder: (context, index) {
-                  final artwork = provider.featured[index];
-                  return FeaturedArtworkCard(
-                    artwork: artwork,
-                    cardWidth: featuredCardWidth,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ArtworkDetailScreen(artwork: artwork),
-                      ),
-                    ),
-                  );
-                },
+          // ── Upcoming (3 next events / exhibitions) ──
+          if (_upcoming.isNotEmpty) ...[
+            const SectionHeader(label: 'Upcoming'),
+            const SizedBox(height: AppSpacing.sm),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Column(
+                children: _upcoming.map((item) => _buildShowRow(item)).toList(),
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
           ],
 
-          // ── Just Added (Recent Grid) ──
+          // ── Just Added (6 newest artworks) ──
           if (provider.artworks.isNotEmpty) ...[
             const SectionHeader(label: 'Just Added'),
             const SizedBox(height: AppSpacing.md),
@@ -135,15 +214,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
 
-          // ── Empty State ──
-          if (provider.featured.isEmpty &&
-              provider.artworks.isEmpty &&
+          // ── Empty state ──
+          if (provider.artworks.isEmpty &&
+              _upcoming.isEmpty &&
               !provider.loading) ...[
             const SizedBox(height: 60),
             const Center(
               child: Column(
                 children: [
-                  Text('🎨', style: TextStyle(fontSize: 48)),
+                  Text('\u{1F3A8}', style: TextStyle(fontSize: 48)),
                   SizedBox(height: AppSpacing.md),
                   Text(
                     'Nothing here yet',
@@ -180,10 +259,162 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ── Show row (same style as shows_screen) ──
+  Widget _buildShowRow(Map<String, dynamic> item) {
+    final kind = item['_kind'] as String;
+    final imageUrl = item['_imageUrl'] as String? ?? '';
+    final date = item['_date'] as DateTime;
+    final badge = item['_badge'] as String? ?? '';
+    final title = item['title']?.toString() ?? '';
+    final location = item['location']?.toString() ?? '';
+    final isFree = item['isFree'] == true;
+    final dateStr = DateFormat('MMM d').format(date);
+    final hasImage = imageUrl.isNotEmpty;
+
+    // Colors per kind
+    final Color color;
+    final Color bg;
+    final IconData kindIcon;
+    if (kind == 'exhibition') {
+      color = const Color(0xFF60a5fa);
+      bg = const Color(0xFF1e2d4a);
+      kindIcon = Icons.museum_outlined;
+    } else if (kind == 'music') {
+      color = const Color(0xFFc084fc);
+      bg = const Color(0xFF2d1b4e);
+      kindIcon = Icons.music_note;
+    } else {
+      color = const Color(0xFF2dd4a0);
+      bg = const Color(0xFF0d3b2e);
+      kindIcon = Icons.event;
+    }
+
+    final details = [
+      badge,
+      if (dateStr.isNotEmpty) dateStr,
+      if (location.isNotEmpty) location,
+    ].join('  ·  ');
+
+    return GestureDetector(
+      onTap: () => _onUpcomingTap(item),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.md,
+          horizontal: AppSpacing.sm,
+        ),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.borderLight)),
+        ),
+        child: Row(
+          children: [
+            // Thumbnail
+            if (hasImage)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                child: Image.network(
+                  imageUrl,
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _iconThumb(bg, kindIcon, color),
+                ),
+              )
+            else
+              _iconThumb(bg, kindIcon, color),
+            const SizedBox(width: AppSpacing.md),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: AppFontSize.md,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.text,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          details,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: AppFontSize.xs,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Free badge
+            if (isFree)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.teal),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: const Text(
+                  'Free',
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: AppColors.teal,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            const Padding(
+              padding: EdgeInsets.only(left: AppSpacing.sm),
+              child: Text(
+                '›',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: AppFontSize.sm,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _iconThumb(Color bg, IconData icon, Color color) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Center(child: Icon(icon, size: 20, color: color)),
+    );
+  }
+
+  // ── 6 newest artworks in a 3-column grid ──
   Widget _buildRecentGrid(ArtworkProvider provider, double screenWidth) {
     final colWidth = (screenWidth - AppSpacing.lg * 2 - AppSpacing.xs * 2) / 3;
     final items = provider.artworks.take(6).toList();
-
     return Wrap(
       spacing: AppSpacing.xs,
       runSpacing: AppSpacing.md,

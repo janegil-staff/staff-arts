@@ -11,6 +11,7 @@ import 'exhibition_detail_screen.dart';
 import 'events_screen.dart';
 import 'exhibitions_screen.dart';
 import 'music_screen.dart';
+import 'create_show_screen.dart';
 
 // ── Type configs ──
 
@@ -147,7 +148,11 @@ class _ShowsScreenState extends State<ShowsScreen> {
       _push(const LoginScreen());
       return;
     }
-    // TODO: Navigate to CreateShow screen
+    Navigator.of(context, rootNavigator: true)
+        .push(MaterialPageRoute(builder: (_) => const CreateShowScreen()))
+        .then((created) {
+      if (created == true) _load(); // Refresh list after creating
+    });
   }
 
   void _handleItemPress(_ShowItem item) {

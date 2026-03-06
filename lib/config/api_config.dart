@@ -8,6 +8,7 @@ class ApiConfig {
   static const String register = '/api/mobile/auth/register';
   static const String me = '/api/mobile/me';
   static const String refreshToken = '/api/mobile/auth/refresh';
+  static const String logout = '/api/mobile/auth/logout'; // ✅ added
 
   // Artworks
   static const String artworks = '/api/artworks';

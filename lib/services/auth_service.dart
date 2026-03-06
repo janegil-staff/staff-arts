@@ -19,14 +19,15 @@ class AuthService {
       'password': password,
     });
     final body = res.data;
-    if (body['success'] != true) {
-      throw Exception(body['error'] ?? 'Login failed');
-    }
+    if (body['success'] != true) throw Exception(body['error'] ?? 'Login failed');
     final data = body['data'];
-    await _api.saveTokens(token: data['token'], refreshToken: data['refreshToken']);
+    await _api.saveTokens(
+      token: data['accessToken'],
+      refreshToken: data['refreshToken'],
+    );
     return AuthResult(
       user: UserModel.fromJson(data['user']),
-      token: data['token'],
+      token: data['accessToken'],
       refreshToken: data['refreshToken'],
     );
   }
@@ -46,14 +47,15 @@ class AuthService {
       'role': role,
     });
     final body = res.data;
-    if (body['success'] != true) {
-      throw Exception(body['error'] ?? 'Registration failed');
-    }
+    if (body['success'] != true) throw Exception(body['error'] ?? 'Registration failed');
     final data = body['data'];
-    await _api.saveTokens(token: data['token'], refreshToken: data['refreshToken']);
+    await _api.saveTokens(
+      token: data['accessToken'],
+      refreshToken: data['refreshToken'],
+    );
     return AuthResult(
       user: UserModel.fromJson(data['user']),
-      token: data['token'],
+      token: data['accessToken'],
       refreshToken: data['refreshToken'],
     );
   }
@@ -61,13 +63,17 @@ class AuthService {
   Future<UserModel> getMe() async {
     final res = await _api.get(ApiConfig.me);
     final body = res.data;
-    if (body['success'] != true) {
-      throw Exception(body['error'] ?? 'Failed to fetch profile');
-    }
-    return UserModel.fromJson(body['data']);
+    if (body['success'] != true) throw Exception(body['error'] ?? 'Failed to fetch profile');
+    return UserModel.fromJson(body['data']['user']);
   }
 
   Future<void> logout() async {
-    await _api.clearTokens();
+    try {
+      await _api.post('/api/mobile/auth/logout');
+    } catch (_) {
+      // Still clear tokens even if server call fails
+    } finally {
+      await _api.clearTokens();
+    }
   }
 }
