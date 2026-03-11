@@ -45,11 +45,28 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       final senderId = sender is Map
           ? (sender['_id'] ?? sender['id'] ?? '').toString()
           : (sender ?? '').toString();
-      if (senderId == myId) return; // ignore own messages
       final convoId = (msg['conversation'] ?? '').toString();
       if (convoId.isEmpty) return;
+
       setState(() {
-        _unreadCounts[convoId] = (_unreadCounts[convoId] ?? 0) + 1;
+        // Increment unread for messages from others
+        if (senderId != myId) {
+          _unreadCounts[convoId] = (_unreadCounts[convoId] ?? 0) + 1;
+        }
+        // Move conversation to top of list
+        final idx = _conversations
+            .indexWhere((c) => (c['_id'] ?? c['id'])?.toString() == convoId);
+        if (idx > 0) {
+          final convo = _conversations.removeAt(idx);
+          // Update lastMessage preview
+          convo['lastMessage'] = msg;
+          convo['lastMessageAt'] = msg['createdAt'];
+          _conversations.insert(0, convo);
+        } else if (idx == 0) {
+          // Already on top, just update preview
+          _conversations[0]['lastMessage'] = msg;
+          _conversations[0]['lastMessageAt'] = msg['createdAt'];
+        }
       });
     });
   }

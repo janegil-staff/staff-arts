@@ -69,6 +69,29 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
     } catch (_) {}
   }
 
+  Future<void> _openChat(String participantId, String name) async {
+    try {
+      final api = ApiService();
+      final res = await api.post(ApiConfig.conversations, data: {
+        'participantId': participantId,
+      });
+      final convoData = res.data['data'] as Map<String, dynamic>;
+      final convoId = (convoData['_id'] ?? convoData['id']).toString();
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            conversationId: convoId,
+            participantId: participantId,
+            name: name,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Open chat error: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -201,15 +224,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   OutlinedButton(
-                    onPressed: () =>
-                        Navigator.of(context, rootNavigator: true).push(
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(
-                          participantId: a.id,
-                          name: a.displayLabel,
-                        ),
-                      ),
-                    ),
+                    onPressed: () => _openChat(a.id, a.displayLabel),
                     child: const Text('Message'),
                   ),
                 ]),

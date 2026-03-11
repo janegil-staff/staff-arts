@@ -3,11 +3,63 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
+import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
 import 'edit_profile_screen.dart';
+import '../messages/conversations_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _api = ApiService();
+  int _unreadCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUnread();
+    _startSocketListener();
+  }
+
+  @override
+  void dispose() {
+    SocketService().removeMessageListener('__profile__');
+    super.dispose();
+  }
+
+  Future<void> _fetchUnread() async {
+    try {
+      final res = await _api.get(ApiConfig.conversationsUnread);
+      final body = res.data as Map<String, dynamic>;
+      if (body['success'] == true && body['data'] is Map) {
+        final counts = body['data'] as Map;
+        final total =
+            counts.values.fold<int>(0, (sum, v) => sum + (v as num).toInt());
+        if (mounted) setState(() => _unreadCount = total);
+      }
+    } catch (_) {}
+  }
+
+  void _startSocketListener() async {
+    final socket = SocketService();
+    await socket.connect();
+    socket.addMessageListener('__profile__', (msg) {
+      if (!mounted) return;
+      final myId = context.read<AuthProvider>().user?.id ?? '';
+      final sender = msg['sender'];
+      final senderId = sender is Map
+          ? (sender['_id'] ?? sender['id'] ?? '').toString()
+          : (sender ?? '').toString();
+      if (senderId != myId) setState(() => _unreadCount++);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -165,15 +217,24 @@ class ProfileScreen extends StatelessWidget {
           ),
           child: Column(
             children: [
-              _menuItem(context, '🎨', 'My Artworks', () {}),
+              _menuItem(context, '🎨', 'My Artworks', null, () {}),
               _divider(),
-              _menuItem(context, '📦', 'Orders', () {}),
+              _menuItem(context, '📦', 'Orders', null, () {}),
               _divider(),
-              _menuItem(context, '✏️', 'Commissions', () {}),
+              _menuItem(context, '✏️', 'Commissions', null, () {}),
               _divider(),
-              _menuItem(context, '💬', 'Messages', () {}),
+              _menuItem(context, '💬', 'Messages',
+                  _unreadCount > 0 ? _unreadCount : null, () {
+                setState(() => _unreadCount = 0);
+                Navigator.of(context, rootNavigator: true)
+                    .push(
+                      MaterialPageRoute(
+                          builder: (_) => const ConversationsScreen()),
+                    )
+                    .then((_) => _fetchUnread());
+              }),
               _divider(),
-              _menuItem(context, '⚙️', 'Settings', () {}),
+              _menuItem(context, '⚙️', 'Settings', null, () {}),
             ],
           ),
         ),
@@ -224,8 +285,8 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _menuItem(
-      BuildContext context, String icon, String label, VoidCallback onTap) {
+  Widget _menuItem(BuildContext context, String icon, String label, int? badge,
+      VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -240,6 +301,27 @@ class ProfileScreen extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: AppFontSize.md, color: AppColors.text)),
             ),
+            if (badge != null && badge > 0) ...[
+              Container(
+                constraints: const BoxConstraints(minWidth: 20),
+                height: 20,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Text(
+                    badge > 99 ? '99+' : '$badge',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
             const Text('›',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 16)),
           ],
