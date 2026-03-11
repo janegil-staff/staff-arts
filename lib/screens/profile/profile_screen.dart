@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -24,7 +25,6 @@ class ProfileScreen extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // Avatar
               if (user.avatar != null && user.avatar!.isNotEmpty)
                 Container(
                   width: 88,
@@ -58,10 +58,7 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-
               const SizedBox(height: AppSpacing.md),
-
-              // Name
               Text(
                 user.displayLabel,
                 style: const TextStyle(
@@ -70,8 +67,6 @@ class ProfileScreen extends StatelessWidget {
                   color: AppColors.text,
                 ),
               ),
-
-              // Username
               if (user.username != null) ...[
                 const SizedBox(height: 2),
                 Text(
@@ -82,11 +77,10 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ],
-
-              // Role badge
               const SizedBox(height: AppSpacing.sm),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppColors.tealBg,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -100,8 +94,6 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // Bio
               if (user.bio != null && user.bio!.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.md),
                 Text(
@@ -114,8 +106,6 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
               ],
-
-              // Location
               if (user.location != null && user.location!.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.sm),
                 Text(
@@ -155,9 +145,9 @@ class ProfileScreen extends StatelessWidget {
             vertical: AppSpacing.md,
           ),
           child: OutlinedButton(
-            onPressed: () {
-              // TODO: Navigate to EditProfile
-            },
+            onPressed: () => Navigator.of(context, rootNavigator: true).push(
+              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+            ),
             child: const Text(
               'Edit Profile',
               style: TextStyle(fontSize: AppFontSize.md),
@@ -175,15 +165,15 @@ class ProfileScreen extends StatelessWidget {
           ),
           child: Column(
             children: [
-              _menuItem('🎨', 'My Artworks', () {}),
+              _menuItem(context, '🎨', 'My Artworks', () {}),
               _divider(),
-              _menuItem('📦', 'Orders', () {}),
+              _menuItem(context, '📦', 'Orders', () {}),
               _divider(),
-              _menuItem('✏️', 'Commissions', () {}),
+              _menuItem(context, '✏️', 'Commissions', () {}),
               _divider(),
-              _menuItem('💬', 'Messages', () {}),
+              _menuItem(context, '💬', 'Messages', () {}),
               _divider(),
-              _menuItem('⚙️', 'Settings', () {}),
+              _menuItem(context, '⚙️', 'Settings', () {}),
             ],
           ),
         ),
@@ -215,36 +205,27 @@ class ProfileScreen extends StatelessWidget {
       child: Container(
         decoration: showDivider
             ? const BoxDecoration(
-                border: Border(
-                  right: BorderSide(color: AppColors.borderLight),
-                ),
-              )
+                border: Border(right: BorderSide(color: AppColors.borderLight)))
             : null,
         child: Column(
           children: [
-            Text(
-              '$count',
-              style: const TextStyle(
-                fontSize: AppFontSize.xl,
-                fontWeight: FontWeight.w600,
-                color: AppColors.text,
-              ),
-            ),
+            Text('$count',
+                style: const TextStyle(
+                    fontSize: AppFontSize.xl,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text)),
             const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: AppFontSize.xs,
-                color: AppColors.textMuted,
-              ),
-            ),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: AppFontSize.xs, color: AppColors.textMuted)),
           ],
         ),
       ),
     );
   }
 
-  Widget _menuItem(String icon, String label, VoidCallback onTap) {
+  Widget _menuItem(
+      BuildContext context, String icon, String label, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -255,25 +236,18 @@ class ProfileScreen extends StatelessWidget {
             Text(icon, style: const TextStyle(fontSize: 18)),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: AppFontSize.md,
-                  color: AppColors.text,
-                ),
-              ),
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: AppFontSize.md, color: AppColors.text)),
             ),
-            const Text(
-              '›',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 16),
-            ),
+            const Text('›',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 16)),
           ],
         ),
       ),
     );
   }
 
-  Widget _divider() {
-    return const Divider(height: 0, indent: AppSpacing.lg, endIndent: AppSpacing.lg);
-  }
+  Widget _divider() =>
+      const Divider(height: 0, indent: AppSpacing.lg, endIndent: AppSpacing.lg);
 }
