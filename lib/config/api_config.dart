@@ -1,6 +1,6 @@
 // lib/config/api_config.dart
 class ApiConfig {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://192.168.1.153:3000';
   static const String androidEmulatorUrl = 'http://10.0.2.2:3000';
 
   // Auth

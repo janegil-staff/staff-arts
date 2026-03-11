@@ -63,9 +63,10 @@ class ApiService {
         "refreshToken": refreshToken,
       });
       if (res.data["success"] == true) {
+        final data = res.data["data"] as Map<String, dynamic>;
         await saveTokens(
-          token: res.data["data"]["token"],
-          refreshToken: res.data["data"]["refreshToken"],
+          token: data["accessToken"],
+          refreshToken: data["refreshToken"],
         );
         return true;
       }
@@ -98,6 +99,10 @@ class ApiService {
 
   Future<Response> put(String path, {dynamic data}) {
     return _dio.put(path, data: data);
+  }
+
+  Future<Response> patch(String path, {dynamic data}) {
+    return _dio.patch(path, data: data);
   }
 
   Future<Response> delete(String path) {

@@ -28,13 +28,11 @@ class _ExhibitionsScreenState extends State<ExhibitionsScreen> {
       final res = await _api.get(ApiConfig.exhibitions);
       final data = res.data as Map<String, dynamic>;
       setState(() {
-        _exhibitions = (data['exhibitions'] ??
-            data['data']?['exhibitions'] ??
-            []) as List<dynamic>;
+        _exhibitions = (data['data'] as List<dynamic>? ?? []);
         _loading = false;
       });
     } catch (e) {
-      print('Exhibitions load error: $e');
+      debugPrint('Exhibitions load error: $e');
       setState(() => _loading = false);
     }
   }
@@ -42,7 +40,16 @@ class _ExhibitionsScreenState extends State<ExhibitionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Exhibitions')),
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        backgroundColor: AppColors.bg,
+        title: const Text('Exhibitions'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: AppColors.text),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+        ),
+      ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.teal))
@@ -73,7 +80,12 @@ class _ExhibitionsScreenState extends State<ExhibitionsScreen> {
                           dateStr +=
                               ' – ${DateFormat('MMM d').format(DateTime.parse(e['endDate']))}';
                       }
-                      final img = e['coverImage']?['url'];
+                      final cover = e['coverImage'];
+                      final img = cover is Map
+                          ? cover['url']?.toString()
+                          : (cover is String && cover.isNotEmpty
+                              ? cover
+                              : null);
                       return GestureDetector(
                         onTap: () => Navigator.push(
                             context,
@@ -95,18 +107,12 @@ class _ExhibitionsScreenState extends State<ExhibitionsScreen> {
                                   borderRadius:
                                       BorderRadius.circular(AppRadius.sm),
                                   child: Image.network(img,
-                                      width: 48, height: 48, fit: BoxFit.cover))
+                                      width: 48,
+                                      height: 48,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => _thumb()))
                             else
-                              Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                      color: const Color(0xFF1e2d4a),
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadius.sm)),
-                                  child: const Center(
-                                      child: Text('🖼️',
-                                          style: TextStyle(fontSize: 16)))),
+                              _thumb(),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
                                 child: Column(
@@ -156,4 +162,12 @@ class _ExhibitionsScreenState extends State<ExhibitionsScreen> {
                 ),
     );
   }
+
+  Widget _thumb() => Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+          color: const Color(0xFF1e2d4a),
+          borderRadius: BorderRadius.circular(AppRadius.sm)),
+      child: const Center(child: Text('🖼️', style: TextStyle(fontSize: 16))));
 }

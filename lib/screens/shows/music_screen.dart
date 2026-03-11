@@ -1,10 +1,10 @@
 // lib/screens/shows/music_screen.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
-import '../../providers/auth_provider.dart';
-import '../../services/api_service.dart';
+import '../../services/shows_service.dart';
 import '../../config/api_config.dart';
+import 'event_detail_screen.dart';
 
 class MusicScreen extends StatefulWidget {
   const MusicScreen({super.key});
@@ -14,10 +14,9 @@ class MusicScreen extends StatefulWidget {
 }
 
 class _MusicScreenState extends State<MusicScreen> {
-  final _api = ApiService();
-  List<dynamic> _tracks = [];
+  final _service = ShowsService();
+  List<dynamic> _events = [];
   bool _loading = true;
-  String? _playingId;
 
   @override
   void initState() {
@@ -27,52 +26,59 @@ class _MusicScreenState extends State<MusicScreen> {
 
   Future<void> _load() async {
     try {
-      final res = await _api.get(ApiConfig.tracks);
-      final data = res.data as Map<String, dynamic>;
+      final all = await _service.fetchEvents();
       setState(() {
-        _tracks = (data['tracks'] ??
-            data['data']?['tracks'] ??
-            data['data'] ??
-            []) as List<dynamic>;
+        _events = all.where((e) => e['category'] == 'music').toList();
         _loading = false;
       });
     } catch (e) {
-      debugPrint('Music load error: $e');
+      debugPrint('Music events load error: $e');
       setState(() => _loading = false);
     }
-  }
-
-  void _navigateToProfile(dynamic profileObj) {
-    if (profileObj == null) return;
-    final auth = context.read<AuthProvider>();
-    final currentUser = auth.user;
-
-    if (profileObj is Map<String, dynamic>) {
-      final profileId = (profileObj['_id'] ?? '').toString();
-      final myId = (currentUser?.id ?? '').toString();
-      if (myId.isNotEmpty && profileId == myId) {
-        return;
-      }
-    }
-  }
-
-  String _formatDuration(dynamic seconds) {
-    final s = (seconds is int) ? seconds : int.tryParse('$seconds') ?? 0;
-    final mins = s ~/ 60;
-    final secs = s % 60;
-    return '$mins:${secs.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        backgroundColor: AppColors.bg,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: AppColors.text),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+        ),
+        title: const Text('Music',
+            style: TextStyle(
+                fontSize: AppFontSize.xxl,
+                fontWeight: FontWeight.w200,
+                letterSpacing: 1)),
+        actions: [
+          if (!_loading)
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.md),
+              child: Center(
+                child: Text('${_events.length} events',
+                    style: const TextStyle(
+                        fontSize: AppFontSize.sm, color: AppColors.textMuted)),
+              ),
+            ),
+        ],
+      ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.teal))
-          : _tracks.isEmpty
+          : _events.isEmpty
               ? _buildEmpty()
-              : _buildContent(),
+              : RefreshIndicator(
+                  color: AppColors.teal,
+                  onRefresh: _load,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 100),
+                    itemCount: _events.length,
+                    itemBuilder: (context, index) => _buildRow(_events[index]),
+                  ),
+                ),
     );
   }
 
@@ -93,14 +99,14 @@ class _MusicScreenState extends State<MusicScreen> {
                 size: 36, color: AppColors.textMuted),
           ),
           const SizedBox(height: AppSpacing.lg),
-          const Text('No tracks yet',
+          const Text('No music events yet',
               style: TextStyle(
                   fontSize: AppFontSize.lg,
                   fontWeight: FontWeight.w300,
                   color: AppColors.textSecondary,
                   letterSpacing: 0.5)),
           const SizedBox(height: AppSpacing.xs),
-          const Text('Music will appear here',
+          const Text('Music events will appear here',
               style: TextStyle(
                   fontSize: AppFontSize.sm, color: AppColors.textMuted)),
         ],
@@ -108,322 +114,84 @@ class _MusicScreenState extends State<MusicScreen> {
     );
   }
 
-  Widget _buildContent() {
-    // Group by album if available
-    return CustomScrollView(
-      slivers: [
-        // App bar
-        SliverAppBar(
-          floating: true,
-          snap: true,
-          backgroundColor: AppColors.bg,
-          title: const Text('Music',
-              style: TextStyle(
-                  fontSize: AppFontSize.xxl,
-                  fontWeight: FontWeight.w200,
-                  letterSpacing: 1)),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.md),
-              child: Text('${_tracks.length} tracks',
-                  style: const TextStyle(
-                      fontSize: AppFontSize.sm, color: AppColors.textMuted)),
-            ),
-          ],
-        ),
-
-        // Featured track (first one with cover image)
-        ..._buildFeaturedTrack(),
-
-        // Track list header
-        const SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-                AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, AppSpacing.md),
-            child: Text('ALL TRACKS',
-                style: TextStyle(
-                    fontSize: AppFontSize.xxs,
-                    letterSpacing: 2.5,
-                    color: AppColors.textMuted,
-                    fontWeight: FontWeight.w600)),
-          ),
-        ),
-
-        // Track list
-        SliverPadding(
-          padding: const EdgeInsets.only(bottom: 120),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _buildTrackTile(_tracks[index], index),
-              childCount: _tracks.length,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<Widget> _buildFeaturedTrack() {
-    final featured = _tracks.firstWhere(
-      (t) =>
-          t is Map<String, dynamic> &&
-          t['coverImage'] != null &&
-          t['coverImage'].toString().isNotEmpty,
-      orElse: () => null,
-    );
-    if (featured == null) return [];
-
-    final track = featured as Map<String, dynamic>;
-    final isPlaying = _playingId == (track['_id'] ?? track['id']);
-    final artist = track['artist'];
-    final artistName = artist is Map<String, dynamic>
-        ? (artist['displayName'] ?? artist['name'] ?? '')
-        : '';
-
-    return [
-      SliverToBoxAdapter(
-        child: GestureDetector(
-          onTap: () {
-            setState(() => _playingId = track['_id'] ?? track['id']);
-          },
-          child: Container(
-            margin: const EdgeInsets.all(AppSpacing.lg),
-            height: 280,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              image: DecorationImage(
-                image: NetworkImage(track['coverImage']),
-                fit: BoxFit.cover,
-              ),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.8),
-                  ],
-                ),
-              ),
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (track['genre'] != null &&
-                      track['genre'].toString().isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.teal.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                        border: Border.all(
-                            color: AppColors.teal.withValues(alpha: 0.4)),
-                      ),
-                      child: Text(
-                        track['genre'].toString().toUpperCase(),
-                        style: const TextStyle(
-                            fontSize: AppFontSize.xxs,
-                            color: AppColors.teal,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1),
-                      ),
-                    ),
-                  Text(track['title'] ?? '',
-                      style: const TextStyle(
-                          fontSize: AppFontSize.xxl,
-                          fontWeight: FontWeight.w300,
-                          color: Colors.white,
-                          letterSpacing: 0.5)),
-                  if (artistName.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(artistName,
-                        style: TextStyle(
-                            fontSize: AppFontSize.md,
-                            color: Colors.white.withValues(alpha: 0.7))),
-                  ],
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isPlaying
-                              ? AppColors.teal
-                              : Colors.white.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          isPlaying
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          color:
-                              isPlaying ? AppColors.textInverse : Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      if (track['duration'] != null)
-                        Text(_formatDuration(track['duration']),
-                            style: TextStyle(
-                                fontSize: AppFontSize.sm,
-                                color: Colors.white.withValues(alpha: 0.6))),
-                      const Spacer(),
-                      Text('${track['plays'] ?? 0} plays',
-                          style: TextStyle(
-                              fontSize: AppFontSize.sm,
-                              color: Colors.white.withValues(alpha: 0.5))),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    ];
-  }
-
-  Widget _buildTrackTile(dynamic item, int index) {
+  Widget _buildRow(dynamic item) {
     if (item is! Map<String, dynamic>) return const SizedBox.shrink();
-    final track = item;
-    final trackId = track['_id'] ?? track['id'] ?? '';
-    final isPlaying = _playingId == trackId;
-    final artist = track['artist'];
-    final artistName = artist is Map<String, dynamic>
-        ? (artist['displayName'] ?? artist['name'] ?? '')
-        : '';
-    final coverImage = track['coverImage']?.toString();
-    final hasCover = coverImage != null && coverImage.isNotEmpty;
+    final e = item;
+    final d = e['date'] ?? e['startDate'];
+    final dateStr =
+        d != null ? DateFormat('MMM d').format(DateTime.parse(d)) : '';
+    final cover = e['coverImage'];
+    final img = cover is Map ? cover['url']?.toString() : null;
+    final subType = (e['type'] as String?)?.replaceAll('_', ' ') ?? '';
 
     return GestureDetector(
-      onTap: () {
-        setState(() => _playingId = trackId);
-      },
+      onTap: () => Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute(builder: (_) => EventDetailScreen(id: e['_id']))),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        margin: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
-        padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: isPlaying ? AppColors.tealBg : AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(
-              color: isPlaying
-                  ? AppColors.teal.withValues(alpha: 0.3)
-                  : AppColors.borderLight),
-        ),
-        child: Row(
-          children: [
-            // Track number or cover
-            if (hasCover)
-              ClipRRect(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+        decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: AppColors.borderLight))),
+        child: Row(children: [
+          if (img != null)
+            ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.sm),
-                child: Image.network(coverImage!,
-                    width: 52,
-                    height: 52,
+                child: Image.network(img,
+                    width: 48,
+                    height: 48,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _coverPlaceholder()),
-              )
-            else
-              _coverPlaceholder(),
-
-            const SizedBox(width: AppSpacing.md),
-
-            // Track info
-            Expanded(
+                    errorBuilder: (_, __, ___) => _thumb()))
+          else
+            _thumb(),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    track['title'] ?? '',
-                    style: TextStyle(
-                      fontSize: AppFontSize.md,
-                      fontWeight: FontWeight.w500,
-                      color: isPlaying ? AppColors.teal : AppColors.text,
-                    ),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(e['title'] ?? '',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      if (artistName.isNotEmpty) ...[
-                        GestureDetector(
-                          onTap: () => _navigateToProfile(artist),
-                          child: Text(artistName,
-                              style: const TextStyle(
-                                  fontSize: AppFontSize.sm,
-                                  color: AppColors.textSecondary)),
-                        ),
-                      ],
-                      if (artistName.isNotEmpty &&
-                          track['album'] != null &&
-                          track['album'].toString().isNotEmpty)
-                        const Text(' · ',
-                            style: TextStyle(
-                                fontSize: AppFontSize.sm,
-                                color: AppColors.textMuted)),
-                      if (track['album'] != null &&
-                          track['album'].toString().isNotEmpty)
-                        Flexible(
-                          child: Text(track['album'],
-                              style: const TextStyle(
-                                  fontSize: AppFontSize.sm,
-                                  color: AppColors.textMuted),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
+                    style: const TextStyle(
+                        color: AppColors.text,
+                        fontWeight: FontWeight.w500,
+                        fontSize: AppFontSize.md)),
+                const SizedBox(height: 3),
+                Text(
+                    [
+                      if (subType.isNotEmpty) subType,
+                      if (dateStr.isNotEmpty) dateStr,
+                      if (e['location'] != null &&
+                          e['location'].toString().isNotEmpty)
+                        e['location'],
+                    ].join('  ·  '),
+                    style: const TextStyle(
+                        color: AppColors.textMuted, fontSize: AppFontSize.xs)),
+              ])),
+          if (e['isFree'] == true)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              margin: const EdgeInsets.only(right: AppSpacing.sm),
+              decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.teal),
+                  borderRadius: BorderRadius.circular(AppRadius.full)),
+              child: const Text('Free',
+                  style: TextStyle(
+                      fontSize: 9,
+                      color: AppColors.teal,
+                      fontWeight: FontWeight.w600)),
             ),
-
-            const SizedBox(width: AppSpacing.sm),
-
-            // Duration & play icon
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (track['duration'] != null)
-                  Text(_formatDuration(track['duration']),
-                      style: const TextStyle(
-                          fontSize: AppFontSize.xs,
-                          color: AppColors.textMuted,
-                          fontFamily: 'monospace')),
-                const SizedBox(height: 4),
-                Icon(
-                  isPlaying
-                      ? Icons.equalizer_rounded
-                      : Icons.play_arrow_rounded,
-                  size: 18,
-                  color: isPlaying ? AppColors.teal : AppColors.textMuted,
-                ),
-              ],
-            ),
-          ],
-        ),
+          const Text('›', style: TextStyle(color: AppColors.textMuted)),
+        ]),
       ),
     );
   }
 
-  Widget _coverPlaceholder() {
-    return Container(
-      width: 52,
-      height: 52,
+  Widget _thumb() => Container(
+      width: 48,
+      height: 48,
       decoration: BoxDecoration(
-        color: AppColors.surfaceDim,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      child: const Icon(Icons.music_note_rounded,
-          size: 22, color: AppColors.textMuted),
-    );
-  }
+          color: const Color(0xFF2d1b4e),
+          borderRadius: BorderRadius.circular(AppRadius.sm)),
+      child: const Center(child: Text('🎵', style: TextStyle(fontSize: 16))));
 }

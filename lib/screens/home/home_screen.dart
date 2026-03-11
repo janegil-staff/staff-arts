@@ -35,28 +35,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchUpcoming() async {
     final items = <Map<String, dynamic>>[];
-    final now = DateTime.now();
+    final df = DateFormat('MMM d');
 
     // Fetch events
     try {
       final res = await _api
           .get(ApiConfig.events, params: {'limit': '10', 'sort': 'date'});
       final body = res.data as Map<String, dynamic>;
-      // ✅ data is the list directly
       final list = (body['data'] as List<dynamic>? ?? []);
       for (final j in list) {
         if (j is! Map) continue;
         final m = Map<String, dynamic>.from(j);
         final d = DateTime.tryParse(m['date']?.toString() ?? '');
-        if (d != null && d.isAfter(now)) {
-          final cover = m['coverImage'];
-          m['_imageUrl'] =
-              (cover is Map) ? (cover['url']?.toString() ?? '') : '';
-          m['_date'] = d;
-          m['_kind'] = 'event';
-          m['_badge'] = _eventLabel(m['type']?.toString() ?? 'other');
-          items.add(m);
-        }
+        final cover = m['coverImage'];
+        m['_imageUrl'] =
+            (cover is Map) ? (cover['url']?.toString() ?? '') : '';
+        m['_date'] = d ?? DateTime.now();
+        m['_kind'] = 'event';
+        m['_badge'] = _eventLabel(m['type']?.toString() ?? 'other');
+        items.add(m);
       }
     } catch (e) {
       debugPrint('Events error: $e');
@@ -67,33 +64,59 @@ class _HomeScreenState extends State<HomeScreen> {
       final res =
           await _api.get(ApiConfig.exhibitions, params: {'limit': '10'});
       final body = res.data as Map<String, dynamic>;
-      // ✅ data is the list directly
       final list = (body['data'] as List<dynamic>? ?? []);
       for (final j in list) {
         if (j is! Map) continue;
         final m = Map<String, dynamic>.from(j);
         final d = DateTime.tryParse(m['startDate']?.toString() ?? '');
-        if (d != null && d.isAfter(now)) {
-          final cover = m['coverImage'];
-          m['_imageUrl'] = (cover is Map)
-              ? (cover['url']?.toString() ?? '')
-              : (cover is String ? cover : '');
-          m['_date'] = d;
-          m['_kind'] = 'exhibition';
-          m['_badge'] = 'Exhibition';
-          items.add(m);
-        }
+        final cover = m['coverImage'];
+        m['_imageUrl'] = (cover is Map)
+            ? (cover['url']?.toString() ?? '')
+            : (cover is String ? cover : '');
+        m['_date'] = d ?? DateTime.now();
+        m['_kind'] = 'exhibition';
+        m['_badge'] = 'Exhibition';
+        items.add(m);
       }
     } catch (e) {
       debugPrint('Exhibitions error: $e');
     }
 
-    // Sort by date ascending (nearest first), take 3
-    items.sort(
-        (a, b) => (a['_date'] as DateTime).compareTo(b['_date'] as DateTime));
+    // Fetch music/tracks
+    try {
+      final res = await _api.get(ApiConfig.tracks, params: {'limit': '10'});
+      final body = res.data as Map<String, dynamic>;
+      final list = (body['tracks'] ??
+          body['data']?['tracks'] ??
+          body['data'] ??
+          []) as List<dynamic>;
+      for (final j in list) {
+        if (j is! Map) continue;
+        final m = Map<String, dynamic>.from(j);
+        final coverImage = m['coverImage']?.toString() ?? '';
+        m['_imageUrl'] = coverImage;
+        m['_date'] = DateTime.now();
+        m['_kind'] = 'music';
+        m['_badge'] = m['genre']?.toString().isNotEmpty == true
+            ? m['genre'].toString()
+            : 'Music';
+        items.add(m);
+      }
+    } catch (e) {
+      debugPrint('Music error: $e');
+    }
+
+    // Sort by date descending (newest first), take 6
+    // Keep only future items, sort ascending (nearest first), take 3
+    final now = DateTime.now();
+    final future = items
+        .where((i) => (i['_date'] as DateTime).isAfter(now))
+        .toList()
+      ..sort((a, b) =>
+          (a['_date'] as DateTime).compareTo(b['_date'] as DateTime));
 
     if (mounted) {
-      setState(() => _upcoming = items.take(3).toList());
+      setState(() => _upcoming = future.take(3).toList());
     }
   }
 
@@ -138,6 +161,7 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (_) => ExhibitionDetailScreen(id: id),
           ));
     }
+    // music taps can be wired up later
   }
 
   @override
@@ -191,9 +215,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // ── Upcoming (3 next events / exhibitions) ──
+          // ── Upcoming (events, exhibitions, music) ──
           if (_upcoming.isNotEmpty) ...[
-            const SectionHeader(label: 'Upcoming'),
+            const SectionHeader(label: 'Shows & Music'),
             const SizedBox(height: AppSpacing.sm),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -259,7 +283,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Show row (same style as shows_screen) ──
   Widget _buildShowRow(Map<String, dynamic> item) {
     final kind = item['_kind'] as String;
     final imageUrl = item['_imageUrl'] as String? ?? '';
@@ -268,25 +291,28 @@ class _HomeScreenState extends State<HomeScreen> {
     final title = item['title']?.toString() ?? '';
     final location = item['location']?.toString() ?? '';
     final isFree = item['isFree'] == true;
-    final dateStr = DateFormat('MMM d').format(date);
     final hasImage = imageUrl.isNotEmpty;
 
-    // Colors per kind
     final Color color;
     final Color bg;
     final IconData kindIcon;
+    final String dateStr;
+
     if (kind == 'exhibition') {
       color = const Color(0xFF60a5fa);
       bg = const Color(0xFF1e2d4a);
       kindIcon = Icons.museum_outlined;
+      dateStr = DateFormat('MMM d').format(date);
     } else if (kind == 'music') {
       color = const Color(0xFFc084fc);
       bg = const Color(0xFF2d1b4e);
       kindIcon = Icons.music_note;
+      dateStr = '';
     } else {
       color = const Color(0xFF2dd4a0);
       bg = const Color(0xFF0d3b2e);
       kindIcon = Icons.event;
+      dateStr = DateFormat('MMM d').format(date);
     }
 
     final details = [
@@ -308,7 +334,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Row(
           children: [
-            // Thumbnail
             if (hasImage)
               ClipRRect(
                 borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -323,7 +348,6 @@ class _HomeScreenState extends State<HomeScreen> {
             else
               _iconThumb(bg, kindIcon, color),
             const SizedBox(width: AppSpacing.md),
-            // Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,10 +390,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            // Free badge
             if (isFree)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   border: Border.all(color: AppColors.teal),
                   borderRadius: BorderRadius.circular(AppRadius.full),
@@ -411,7 +435,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── 6 newest artworks in a 3-column grid ──
   Widget _buildRecentGrid(ArtworkProvider provider, double screenWidth) {
     final colWidth = (screenWidth - AppSpacing.lg * 2 - AppSpacing.xs * 2) / 3;
     final items = provider.artworks.take(6).toList();

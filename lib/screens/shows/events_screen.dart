@@ -27,14 +27,13 @@ class _EventsScreenState extends State<EventsScreen> {
     try {
       final res = await _api.get(ApiConfig.events);
       final data = res.data as Map<String, dynamic>;
-      final list =
-          (data['events'] ?? data['data']?['events'] ?? []) as List<dynamic>;
+      final list = (data['data'] as List<dynamic>? ?? []);
       setState(() {
         _events = list.where((e) => e['category'] != 'music').toList();
         _loading = false;
       });
     } catch (e) {
-      print('Events load error: $e');
+      debugPrint('Events load error: $e');
       setState(() => _loading = false);
     }
   }
@@ -42,7 +41,16 @@ class _EventsScreenState extends State<EventsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Events')),
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        backgroundColor: AppColors.bg,
+        title: const Text('Events'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: AppColors.text),
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+        ),
+      ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.teal))
@@ -69,7 +77,9 @@ class _EventsScreenState extends State<EventsScreen> {
                       final dateStr = d != null
                           ? DateFormat('MMM d').format(DateTime.parse(d))
                           : '';
-                      final img = e['coverImage']?['url'];
+                      final cover = e['coverImage'];
+                      final img =
+                          cover is Map ? cover['url']?.toString() : null;
                       return GestureDetector(
                         onTap: () => Navigator.push(
                             context,
@@ -91,18 +101,12 @@ class _EventsScreenState extends State<EventsScreen> {
                                   borderRadius:
                                       BorderRadius.circular(AppRadius.sm),
                                   child: Image.network(img,
-                                      width: 48, height: 48, fit: BoxFit.cover))
+                                      width: 48,
+                                      height: 48,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => _thumb()))
                             else
-                              Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                      color: const Color(0xFF0d3b2e),
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadius.sm)),
-                                  child: const Center(
-                                      child: Text('📅',
-                                          style: TextStyle(fontSize: 16)))),
+                              _thumb(),
                             const SizedBox(width: AppSpacing.md),
                             Expanded(
                                 child: Column(
@@ -136,4 +140,12 @@ class _EventsScreenState extends State<EventsScreen> {
                 ),
     );
   }
+
+  Widget _thumb() => Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+          color: const Color(0xFF0d3b2e),
+          borderRadius: BorderRadius.circular(AppRadius.sm)),
+      child: const Center(child: Text('📅', style: TextStyle(fontSize: 16))));
 }

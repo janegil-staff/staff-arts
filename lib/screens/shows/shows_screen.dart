@@ -87,13 +87,22 @@ class _ShowsScreenState extends State<ShowsScreen> {
     final all = <_ShowItem>[];
     final df = DateFormat('MMM d');
 
-    final events = await _showsService.fetchEvents();
+    final results = await Future.wait([
+      _showsService.fetchEvents(),
+      _showsService.fetchExhibitions(),
+    ]);
+
+    final events = results[0];
+    final exhibitions = results[1];
+
     for (final e in events) {
       final d = e['date'] ?? e['startDate'];
       final isMusicShow = e['category'] == 'music';
       final subType = (e['type'] as String?)?.replaceAll('_', ' ') ?? '';
       final dateStr = d != null ? df.format(DateTime.parse(d)) : '';
       final sortDate = d != null ? DateTime.parse(d).millisecondsSinceEpoch : 0;
+      final cover = e['coverImage'];
+      final imageUrl = cover is Map ? cover['url']?.toString() : null;
       all.add(_ShowItem(
           id: e['_id'] ?? '',
           type: isMusicShow ? 'music' : 'event',
@@ -101,12 +110,11 @@ class _ShowsScreenState extends State<ShowsScreen> {
           subType: subType,
           dateStr: dateStr,
           location: e['location'] ?? '',
-          imageUrl: e['coverImage']?['url'],
+          imageUrl: imageUrl,
           isFree: e['isFree'] == true,
           sortDate: sortDate));
     }
 
-    final exhibitions = await _showsService.fetchExhibitions();
     for (final e in exhibitions) {
       final d = e['startDate'];
       var dateStr = '';
@@ -116,6 +124,8 @@ class _ShowsScreenState extends State<ShowsScreen> {
           dateStr += ' – ${df.format(DateTime.parse(e['endDate']))}';
       }
       final sortDate = d != null ? DateTime.parse(d).millisecondsSinceEpoch : 0;
+      final cover = e['coverImage'];
+      final imageUrl = cover is Map ? cover['url']?.toString() : null;
       all.add(_ShowItem(
           id: e['_id'] ?? '',
           type: 'exhibition',
@@ -123,7 +133,7 @@ class _ShowsScreenState extends State<ShowsScreen> {
           subType: e['status'] ?? '',
           dateStr: dateStr,
           location: e['location'] ?? '',
-          imageUrl: e['coverImage']?['url'],
+          imageUrl: imageUrl,
           isFree: e['isFree'] == true,
           sortDate: sortDate));
     }
@@ -151,7 +161,7 @@ class _ShowsScreenState extends State<ShowsScreen> {
     Navigator.of(context, rootNavigator: true)
         .push(MaterialPageRoute(builder: (_) => const CreateShowScreen()))
         .then((created) {
-      if (created == true) _load(); // Refresh list after creating
+      if (created == true) _load();
     });
   }
 
@@ -200,8 +210,8 @@ class _ShowsScreenState extends State<ShowsScreen> {
                   _navButton('🖼️', 'Exhibitions', exhibitionCount,
                       () => _push(const ExhibitionsScreen())),
                   const SizedBox(width: AppSpacing.sm),
-                  _navButton(
-                      '🎵', 'Music', musicCount, () => _push(MusicScreen())),
+                  _navButton('🎵', 'Music', musicCount,
+                      () => _push(const MusicScreen())),
                 ]),
               ),
             ),
@@ -398,12 +408,11 @@ class _ShowsScreenState extends State<ShowsScreen> {
 
   Widget _iconThumb(_TypeConfig cfg) {
     return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-          color: cfg.bg, borderRadius: BorderRadius.circular(AppRadius.sm)),
-      child:
-          Center(child: Text(cfg.icon, style: const TextStyle(fontSize: 16))),
-    );
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+            color: cfg.bg, borderRadius: BorderRadius.circular(AppRadius.sm)),
+        child: Center(
+            child: Text(cfg.icon, style: const TextStyle(fontSize: 16))));
   }
 }
