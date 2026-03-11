@@ -24,6 +24,7 @@ class ApiConfig {
 
   // Conversations
   static const String conversations = '/api/conversations';
+  static const String conversationsUnread = '/api/conversations/unread';
   static String messages(String convoId) => '/api/conversations/$convoId/messages';
 
   // Music

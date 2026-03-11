@@ -15,6 +15,9 @@ import 'screens/shows/shows_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/messages/conversations_screen.dart';
 import 'screens/messages/chat_screen.dart';
+import 'services/api_service.dart';
+import 'config/api_config.dart';
+import 'services/socket_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,14 +71,79 @@ class MainShell extends StatefulWidget {
 class MainShellState extends State<MainShell> {
   int _currentIndex = 0;
   int? _pendingAuthTab;
+  int _unreadCount = 0;
+  final _api = ApiService();
 
-  /// Public method so child screens (e.g. UploadScreen) can switch tabs
+  final _labels = const ['Home', 'Explore', '', 'Shows', 'Profile'];
+  final _icons = const [
+    '\u{1F3E0}',
+    '\u{1F50D}',
+    '+',
+    '\u{1F3AD}',
+    '\u{1F464}'
+  ];
+
+  bool _wasAuthenticated = false;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  Future<void> _fetchUnreadCount() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) return;
+    try {
+      final res = await _api.get(ApiConfig.conversations);
+      final body = res.data as Map<String, dynamic>;
+      if (body['success'] == true && body['data'] is List) {
+        final convos = body['data'] as List;
+        final myId = auth.user?.id ?? '';
+        int total = 0;
+        for (final c in convos) {
+          if (c is! Map) continue;
+          final lastMsg = c['lastMessage'];
+          if (lastMsg is Map) {
+            final senderId = lastMsg['sender'] is Map
+                ? (lastMsg['sender']['_id'] ?? lastMsg['sender']['id'] ?? '')
+                    .toString()
+                : (lastMsg['sender'] ?? '').toString();
+            final readBy = (lastMsg['readBy'] as List? ?? [])
+                .map((e) => e.toString())
+                .toList();
+            if (senderId != myId && !readBy.contains(myId)) total++;
+          }
+        }
+        if (mounted) setState(() => _unreadCount = total);
+      }
+    } catch (_) {}
+  }
+
+  void _startSocketBadgeListener() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) return;
+    final socket = SocketService();
+    await socket.connect();
+    // Re-register on reconnect
+    socket.onReconnect(() {
+      if (mounted) _startSocketBadgeListener();
+    });
+    socket.addMessageListener('__badge__', (msg) {
+      if (!mounted) return;
+      final myId = context.read<AuthProvider>().user?.id ?? '';
+      final sender = msg['sender'];
+      final senderId = sender is Map
+          ? (sender['_id'] ?? sender['id'] ?? '').toString()
+          : (sender ?? '').toString();
+      if (senderId != myId) {
+        setState(() => _unreadCount++);
+      }
+    });
+  }
+
   void switchToTab(int index) {
     setState(() => _currentIndex = index);
   }
-
-  final _labels = const ['Home', 'Explore', '', 'Shows', 'Profile'];
-  final _icons = const ['\u{1F3E0}', '\u{1F50D}', '+', '\u{1F3AD}', '\u{1F464}'];
 
   @override
   void didChangeDependencies() {
@@ -83,7 +151,19 @@ class MainShellState extends State<MainShell> {
     final auth = context.watch<AuthProvider>();
     final tabProvider = context.watch<TabProvider>();
 
-    // If user just authenticated and we had a pending tab, navigate there
+    // Fetch unread count when user logs in
+    if (auth.isAuthenticated && !_wasAuthenticated) {
+      _wasAuthenticated = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fetchUnreadCount();
+        _startSocketBadgeListener();
+      });
+    } else if (!auth.isAuthenticated && _wasAuthenticated) {
+      _wasAuthenticated = false;
+      if (mounted) setState(() => _unreadCount = 0);
+      SocketService().removeMessageListener('__badge__');
+    }
+
     if (auth.isAuthenticated && _pendingAuthTab != null) {
       final tab = _pendingAuthTab!;
       _pendingAuthTab = null;
@@ -92,14 +172,12 @@ class MainShellState extends State<MainShell> {
       });
     }
 
-    // If another screen requested a tab switch (e.g. upload -> home)
     if (tabProvider.currentIndex != _currentIndex) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _currentIndex = tabProvider.currentIndex);
       });
     }
 
-    // If artworks need refreshing (e.g. after upload)
     if (tabProvider.shouldRefreshArtworks) {
       tabProvider.clearRefreshFlag();
       final artworkProvider = context.read<ArtworkProvider>();
@@ -126,7 +204,6 @@ class MainShellState extends State<MainShell> {
     }
 
     setState(() => _currentIndex = index);
-    // Keep TabProvider in sync so other screens know the current tab
     context.read<TabProvider>().switchToTab(index);
   }
 
@@ -204,7 +281,36 @@ class MainShellState extends State<MainShell> {
           ),
           actions: [
             IconButton(
-              icon: const Text('\u{1F4AC}', style: TextStyle(fontSize: 22)),
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Text('\u{1F4AC}', style: TextStyle(fontSize: 22)),
+                  if (_unreadCount > 0)
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Container(
+                        constraints: const BoxConstraints(minWidth: 16),
+                        height: 16,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _unreadCount > 99 ? '99+' : '$_unreadCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
               onPressed: () {
                 if (!auth.isAuthenticated) {
                   _pushAuthScreen();
@@ -212,8 +318,9 @@ class MainShellState extends State<MainShell> {
                 }
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ConversationsScreen()),
-                );
+                  MaterialPageRoute(
+                      builder: (_) => const ConversationsScreen()),
+                ).then((_) => _fetchUnreadCount());
               },
             ),
           ],

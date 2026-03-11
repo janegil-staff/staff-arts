@@ -3,28 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
+import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
 
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
   final String name;
   final String? participantId;
-  final String? listingId;
-  final String? listingTitle;
-  final double? listingPrice;
-  final String? listingCurrency;
-  final String? listingImage;
 
   const ChatScreen({
     super.key,
     this.conversationId,
     required this.name,
     this.participantId,
-    this.listingId,
-    this.listingTitle,
-    this.listingPrice,
-    this.listingCurrency,
-    this.listingImage,
   });
 
   @override
@@ -33,6 +25,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final _api = ApiService();
+  final _socket = SocketService();
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   List<Map<String, dynamic>> _messages = [];
@@ -44,12 +37,37 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _convoId = widget.conversationId;
-    if (_convoId != null) _load();
-    else setState(() => _loading = false);
+    _initChat();
+  }
+
+  Future<void> _initChat() async {
+    await _socket.connect();
+    if (_convoId != null) {
+      await _load();
+      _socket.joinConversation(_convoId!);
+      _socket.onNewMessage(_convoId!, _onSocketMessage);
+    } else {
+      setState(() => _loading = false);
+    }
+  }
+
+  void _onSocketMessage(Map<String, dynamic> msg) {
+    final myId = context.read<AuthProvider>().user?.id ?? '';
+    final senderId = _extractSenderId(msg);
+    // Don't add duplicate — our own messages are already added optimistically
+    if (senderId == myId) return;
+    if (mounted) {
+      setState(() => _messages.add(msg));
+      _scrollToBottom();
+    }
   }
 
   @override
   void dispose() {
+    if (_convoId != null) {
+      // Don't leave the room — stay joined so badge keeps updating
+      _socket.removeMessageListener('__convo_${_convoId!}');
+    }
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -58,21 +76,27 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _load() async {
     if (_convoId == null) return;
     try {
-      final res = await _api.get('/api/messages/conversations/$_convoId/messages');
-      final body = res.data;
-      List msgs;
+      final res = await _api.get(ApiConfig.messages(_convoId!));
+      final body = res.data as Map<String, dynamic>;
       if (body['success'] == true && body['data'] is List) {
-        msgs = body['data'];
-      } else if (body['messages'] is List) {
-        msgs = body['messages'];
-      } else {
-        msgs = [];
+        setState(
+            () => _messages = List<Map<String, dynamic>>.from(body['data']));
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
       }
-      setState(() => _messages = List<Map<String, dynamic>>.from(msgs));
     } catch (e) {
-      debugPrint('[Chat] Load error: $e');
+      debugPrint('Chat load error: $e');
     }
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   Future<void> _send() async {
@@ -82,40 +106,66 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _sending = true);
 
     try {
-      if (_convoId != null) {
-        // Send to existing conversation
-        final res = await _api.post(
-          '/api/messages/conversations/$_convoId/messages',
-          data: {'content': text},
-        );
-        // Check if new convoId was returned
-        final newId = res.data['data']?['conversationId'] ?? res.data['conversationId'];
-        if (newId != null) _convoId ??= newId;
-      } else if (widget.participantId != null) {
-        // Create new conversation
-        final res = await _api.post('/api/messages/conversations', data: {
+      // If no conversation yet, create one first
+      if (_convoId == null && widget.participantId != null) {
+        final convoRes = await _api.post(ApiConfig.conversations, data: {
           'participantId': widget.participantId,
-          'content': text,
         });
-        final newId = res.data['data']?['conversationId'] ??
-            res.data['data']?['_id'] ??
-            res.data['conversationId'];
-        if (newId != null) _convoId = newId;
+        final convoData = convoRes.data['data'] as Map<String, dynamic>;
+        _convoId = (convoData['_id'] ?? convoData['id']).toString();
+        await _socket.connect();
+        _socket.joinConversation(_convoId!);
+        _socket.onNewMessage(_convoId!, _onSocketMessage);
       }
-      await _load();
+
+      if (_convoId == null) return;
+
+      // Optimistically add message to UI
+      final myUser = context.read<AuthProvider>().user;
+      final optimistic = {
+        '_id': 'temp_${DateTime.now().millisecondsSinceEpoch}',
+        'text': text,
+        'sender': {
+          '_id': myUser?.id ?? '',
+          'displayName': myUser?.displayName ?? myUser?.name ?? '',
+          'avatar': myUser?.avatar,
+        },
+        'createdAt': DateTime.now().toIso8601String(),
+        'readBy': [myUser?.id ?? ''],
+      };
+      setState(() => _messages.add(optimistic));
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+
+      // Send to server
+      final res =
+          await _api.post(ApiConfig.messages(_convoId!), data: {'text': text});
+      final sent = res.data['data'] as Map<String, dynamic>;
+
+      // Replace optimistic with real message
+      setState(() {
+        final idx = _messages.indexWhere((m) => m['_id'] == optimistic['_id']);
+        if (idx != -1) _messages[idx] = sent;
+      });
     } catch (e) {
-      debugPrint('[Chat] Send error: $e');
+      debugPrint('Chat send error: $e');
+      // Remove optimistic on failure
+      setState(() => _messages.removeWhere(
+          (m) => m['_id']?.toString().startsWith('temp_') == true));
     }
-    setState(() => _sending = false);
+    if (mounted) setState(() => _sending = false);
   }
 
-  String _formatTime(String? dateStr) {
-    if (dateStr == null) return '';
+  String _extractSenderId(Map<String, dynamic> msg) {
+    final sender = msg['sender'];
+    if (sender is Map) return (sender['_id'] ?? sender['id'] ?? '').toString();
+    return (sender ?? msg['senderId'] ?? '').toString();
+  }
+
+  String _formatTime(dynamic dateVal) {
+    if (dateVal == null) return '';
     try {
-      final d = DateTime.parse(dateStr);
-      final h = d.hour.toString().padLeft(2, '0');
-      final m = d.minute.toString().padLeft(2, '0');
-      return '$h:$m';
+      final d = DateTime.parse(dateVal.toString());
+      return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
     } catch (_) {
       return '';
     }
@@ -123,161 +173,130 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = context.read<AuthProvider>().user?.id;
+    final myId = context.read<AuthProvider>().user?.id ?? '';
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.name)),
-      body: Column(
-        children: [
-          // ── Listing Banner ──
-          if (widget.listingTitle != null)
-            GestureDetector(
-              onTap: () {
-                if (widget.listingId != null) {
-                  // TODO: navigate to artwork detail
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: AppColors.surface,
-                  border: Border(bottom: BorderSide(color: AppColors.borderLight)),
-                ),
-                child: Row(
-                  children: [
-                    if (widget.listingImage != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(widget.listingImage!, width: 48, height: 48, fit: BoxFit.cover),
-                      ),
-                    if (widget.listingImage != null) const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.listingTitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: AppFontSize.sm, fontWeight: FontWeight.w600, color: AppColors.text),
-                          ),
-                          if (widget.listingPrice != null)
-                            Text(
-                              '${widget.listingCurrency ?? ''} ${widget.listingPrice!.toStringAsFixed(0)}',
-                              style: const TextStyle(fontSize: 12, color: AppColors.teal),
-                            ),
-                        ],
-                      ),
+      backgroundColor: AppColors.bg,
+      appBar: AppBar(
+        backgroundColor: AppColors.bg,
+        title: Text(widget.name,
+            style: const TextStyle(fontWeight: FontWeight.w300)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: AppColors.text),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Column(children: [
+        // Messages
+        Expanded(
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.teal))
+              : _messages.isEmpty
+                  ? Center(
+                      child: Text('Start a conversation with ${widget.name}',
+                          style: const TextStyle(
+                              fontSize: AppFontSize.sm,
+                              color: AppColors.textMuted)))
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, i) {
+                        final msg = _messages[i];
+                        final senderId = _extractSenderId(msg);
+                        return _bubble(msg, senderId == myId);
+                      },
                     ),
-                    const Text('›', style: TextStyle(fontSize: 20, color: AppColors.textMuted)),
-                  ],
+        ),
+
+        // Input bar
+        Container(
+          padding: EdgeInsets.only(
+              left: 12,
+              right: 12,
+              top: 10,
+              bottom: bottomPadding > 0 ? bottomPadding : 10),
+          decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(top: BorderSide(color: AppColors.borderLight))),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Container(
+                  constraints:
+                      const BoxConstraints(minHeight: 42, maxHeight: 100),
+                  decoration: BoxDecoration(
+                      color: AppColors.bg,
+                      borderRadius: BorderRadius.circular(22)),
+                  child: TextField(
+                    controller: _controller,
+                    maxLines: null,
+                    maxLength: 2000,
+                    style: const TextStyle(
+                        color: AppColors.text, fontSize: AppFontSize.sm),
+                    decoration: const InputDecoration(
+                      hintText: 'Type a message...',
+                      hintStyle: TextStyle(color: AppColors.textMuted),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      fillColor: Colors.transparent,
+                      filled: true,
+                      counterText: '',
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
+                    onSubmitted: (_) => _send(),
+                  ),
                 ),
               ),
-            ),
-
-          // ── Messages ──
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.teal))
-                : _messages.isEmpty
-                    ? Center(
-                        child: Text(
-                          'Start a conversation with ${widget.name}',
-                          style: const TextStyle(fontSize: AppFontSize.sm, color: AppColors.textMuted),
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        reverse: true,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          // Messages are newest-first when reversed
-                          final msg = _messages[_messages.length - 1 - index];
-                          final senderId = msg['senderId'] is Map
-                              ? msg['senderId']['_id']
-                              : msg['senderId'] ?? msg['sender'];
-                          final isMe = senderId == currentUserId;
-                          return _bubble(msg, isMe);
-                        },
-                      ),
-          ),
-
-          // ── Input Bar ──
-          Container(
-            padding: EdgeInsets.only(
-              left: 12, right: 12, top: 10,
-              bottom: bottomPadding > 0 ? bottomPadding : 10,
-            ),
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              border: Border(top: BorderSide(color: AppColors.borderLight)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 42, maxHeight: 100),
-                    decoration: BoxDecoration(
-                      color: AppColors.bg,
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: TextField(
-                      controller: _controller,
-                      maxLines: null,
-                      maxLength: 2000,
-                      style: const TextStyle(color: AppColors.text, fontSize: AppFontSize.sm),
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message...',
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        fillColor: Colors.transparent,
-                        filled: true,
-                        counterText: '',
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      ),
-                      onSubmitted: (_) => _send(),
-                    ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _send,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _sending
+                        ? AppColors.teal.withValues(alpha: 0.35)
+                        : AppColors.teal,
+                  ),
+                  child: Center(
+                    child: _sending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.arrow_upward_rounded,
+                            color: Colors.white, size: 20),
                   ),
                 ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _send,
-                  child: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _sending ? AppColors.teal.withValues(alpha: 0.35) : AppColors.teal,
-                    ),
-                    child: Center(
-                      child: Text(
-                        _sending ? '···' : '↑',
-                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 
   Widget _bubble(Map<String, dynamic> msg, bool isMe) {
-    final text = msg['text'] ?? msg['content'] ?? '';
+    final text = (msg['text'] ?? '').toString();
     final time = _formatTime(msg['createdAt']);
+    final isPending = msg['_id']?.toString().startsWith('temp_') == true;
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 3),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+        margin: const EdgeInsets.only(bottom: 4),
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isMe ? AppColors.teal : AppColors.surface,
@@ -291,23 +310,29 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            if (text.isNotEmpty)
-              Text(
-                text,
+            Text(text,
                 style: TextStyle(
-                  fontSize: AppFontSize.sm,
-                  color: isMe ? Colors.white : AppColors.text,
-                  height: 1.4,
-                ),
-              ),
+                    fontSize: AppFontSize.sm,
+                    color: isMe ? Colors.white : AppColors.text,
+                    height: 1.4)),
             const SizedBox(height: 4),
-            Text(
-              time,
-              style: TextStyle(
-                fontSize: 10,
-                color: isMe ? Colors.white.withValues(alpha: 0.7) : AppColors.textMuted,
-              ),
-            ),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(time,
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: isMe
+                          ? Colors.white.withValues(alpha: 0.7)
+                          : AppColors.textMuted)),
+              if (isMe && isPending) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.access_time_rounded,
+                    size: 10, color: Colors.white.withValues(alpha: 0.7)),
+              ] else if (isMe) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.done_rounded,
+                    size: 10, color: Colors.white.withValues(alpha: 0.7)),
+              ],
+            ]),
           ],
         ),
       ),

@@ -8,6 +8,7 @@ import '../../models/artwork_model.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/artwork_card.dart';
 import '../artwork/artwork_detail_screen.dart';
+import '../messages/chat_screen.dart';
 
 class ArtistProfileScreen extends StatefulWidget {
   final String? userId;
@@ -200,7 +201,17 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   OutlinedButton(
-                      onPressed: () {}, child: const Text('Message')),
+                    onPressed: () =>
+                        Navigator.of(context, rootNavigator: true).push(
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          participantId: a.id,
+                          name: a.displayLabel,
+                        ),
+                      ),
+                    ),
+                    child: const Text('Message'),
+                  ),
                 ]),
               ],
             ),
