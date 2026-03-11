@@ -43,16 +43,16 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
         _artist = UserModel.fromJson(data);
       });
 
-      // Fetch artworks
       final artRes = await _api.get(ApiConfig.artworks, params: {
         'artist': _artist!.id,
         'status': 'all',
         'limit': 20,
       });
+      final artList = (artRes.data['data'] ?? artRes.data['artworks'] ?? [])
+          as List<dynamic>;
       setState(() {
-        _artworks = (artRes.data['artworks'] ?? [])
-            .map<ArtworkModel>((j) => ArtworkModel.fromJson(j))
-            .toList();
+        _artworks =
+            artList.map<ArtworkModel>((j) => ArtworkModel.fromJson(j)).toList();
       });
     } catch (e) {
       debugPrint('Artist profile error: $e');
@@ -123,8 +123,7 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
                   child: a.avatar != null
                       ? ClipOval(
                           child: CachedNetworkImage(
-                              imageUrl: a.avatar!, fit: BoxFit.cover),
-                        )
+                              imageUrl: a.avatar!, fit: BoxFit.cover))
                       : Center(
                           child: Text(
                             (a.displayName ?? a.name ?? '?')[0].toUpperCase(),
@@ -146,25 +145,20 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        a.displayLabel,
+                Row(children: [
+                  Expanded(
+                    child: Text(a.displayLabel,
                         style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.text),
-                      ),
-                    ),
-                    if (a.verified)
-                      const Padding(
+                            color: AppColors.text)),
+                  ),
+                  if (a.verified)
+                    const Padding(
                         padding: EdgeInsets.only(left: 6),
                         child: Icon(Icons.verified,
-                            color: AppColors.teal, size: 20),
-                      ),
-                  ],
-                ),
+                            color: AppColors.teal, size: 20)),
+                ]),
                 if (a.username != null)
                   Text('@${a.username}',
                       style: const TextStyle(
@@ -186,42 +180,28 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
                           color: AppColors.textMuted)),
                 ],
                 const SizedBox(height: AppSpacing.md),
-
-                // Stats
-                Row(
-                  children: [
-                    _stat('${a.followerCount}', 'Followers'),
-                    const SizedBox(width: AppSpacing.xl),
-                    _stat('${a.followingCount}', 'Following'),
-                    const SizedBox(width: AppSpacing.xl),
-                    _stat('${a.artworkCount}', 'Works'),
-                  ],
-                ),
+                Row(children: [
+                  _stat('${a.followerCount}', 'Followers'),
+                  const SizedBox(width: AppSpacing.xl),
+                  _stat('${a.followingCount}', 'Following'),
+                  const SizedBox(width: AppSpacing.xl),
+                  _stat('${a.artworkCount}', 'Works'),
+                ]),
                 const SizedBox(height: AppSpacing.md),
-
-                // Follow + Message buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: _isFollowing
-                          ? OutlinedButton(
-                              onPressed: _toggleFollow,
-                              child: const Text('Following'),
-                            )
-                          : ElevatedButton(
-                              onPressed: _toggleFollow,
-                              child: const Text('Follow'),
-                            ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    OutlinedButton(
-                      onPressed: () {
-                        // TODO: navigate to chat
-                      },
-                      child: const Text('Message'),
-                    ),
-                  ],
-                ),
+                Row(children: [
+                  Expanded(
+                    child: _isFollowing
+                        ? OutlinedButton(
+                            onPressed: _toggleFollow,
+                            child: const Text('Following'))
+                        : ElevatedButton(
+                            onPressed: _toggleFollow,
+                            child: const Text('Follow')),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  OutlinedButton(
+                      onPressed: () {}, child: const Text('Message')),
+                ]),
               ],
             ),
           ),
@@ -232,15 +212,12 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
           if (_artworks.isNotEmpty) ...[
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-              child: Text(
-                'ARTWORKS',
-                style: TextStyle(
-                  fontSize: AppFontSize.xxs,
-                  letterSpacing: 2,
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: Text('ARTWORKS',
+                  style: TextStyle(
+                      fontSize: AppFontSize.xxs,
+                      letterSpacing: 2,
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w600)),
             ),
             const SizedBox(height: AppSpacing.md),
             Padding(
@@ -253,11 +230,10 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
                     artwork: artwork,
                     width: colWidth,
                     onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) =>
-                              ArtworkDetailScreen(artwork: artwork)),
-                    ),
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                ArtworkDetailScreen(artwork: artwork))),
                   );
                 }).toList(),
               ),
@@ -269,17 +245,15 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
   }
 
   Widget _stat(String count, String label) {
-    return Column(
-      children: [
-        Text(count,
-            style: const TextStyle(
-                fontSize: AppFontSize.lg,
-                fontWeight: FontWeight.w600,
-                color: AppColors.text)),
-        Text(label,
-            style: const TextStyle(
-                fontSize: AppFontSize.xs, color: AppColors.textMuted)),
-      ],
-    );
+    return Column(children: [
+      Text(count,
+          style: const TextStyle(
+              fontSize: AppFontSize.lg,
+              fontWeight: FontWeight.w600,
+              color: AppColors.text)),
+      Text(label,
+          style: const TextStyle(
+              fontSize: AppFontSize.xs, color: AppColors.textMuted)),
+    ]);
   }
 }
