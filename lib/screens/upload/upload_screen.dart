@@ -193,12 +193,14 @@ class _UploadScreenState extends State<UploadScreen> {
             _progress = 'Uploading image ${i + 1} of ${_images.length}...');
 
         final file = _images[i];
+// After
         final formData = FormData.fromMap({
-          'file': await MultipartFile.fromFile(file.path, filename: file.name),
-          'folder': 'artworks',
+          'image': await MultipartFile.fromFile(file.path, filename: file.name),
         });
-
-        final res = await _api.post(ApiConfig.uploadImage, data: formData);
+        final res = await _api.post(
+          '${ApiConfig.uploadImage}?folder=artworks',
+          data: formData,
+        );
         final data = res.data['data'] ?? res.data;
         uploadedImages.add({
           'url': data['url'],
