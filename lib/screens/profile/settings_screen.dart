@@ -404,7 +404,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (userId == null) return;
     try {
       await _api.delete(ApiConfig.user(userId));
-      if (mounted) auth.logout();
+      if (mounted) {
+        await auth.logout();
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
