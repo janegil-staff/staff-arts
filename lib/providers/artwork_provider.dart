@@ -20,6 +20,22 @@ class ArtworkProvider extends ChangeNotifier {
   String? get error => _error;
   bool get hasMore => _hasMore;
 
+  List<String> _mediums = [];
+  List<String> get mediums => _mediums;
+
+  Future<void> fetchMediums() async {
+    try {
+      final res = await _api.get(ApiConfig.artworkMediums);
+      final body = res.data as Map<String, dynamic>;
+      if (body['success'] == true && body['data'] is List) {
+        _mediums = List<String>.from(body['data']);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchMediums error: $e');
+    }
+  }
+
   Future<void> fetchArtworks({
     bool refresh = false,
     Map<String, dynamic>? filters,
@@ -49,7 +65,8 @@ class ArtworkProvider extends ChangeNotifier {
 
       // ✅ API returns { success: true, data: [...] }
       final list = (body['data'] as List? ?? [])
-          .map<ArtworkModel>((j) => ArtworkModel.fromJson(j as Map<String, dynamic>))
+          .map<ArtworkModel>(
+              (j) => ArtworkModel.fromJson(j as Map<String, dynamic>))
           .toList();
 
       _artworks.addAll(list);
@@ -73,7 +90,8 @@ class ArtworkProvider extends ChangeNotifier {
 
       // ✅ same fix
       _featured = (body['data'] as List? ?? [])
-          .map<ArtworkModel>((j) => ArtworkModel.fromJson(j as Map<String, dynamic>))
+          .map<ArtworkModel>(
+              (j) => ArtworkModel.fromJson(j as Map<String, dynamic>))
           .toList();
 
       notifyListeners();

@@ -22,14 +22,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _showFilterRow = true;
   double _lastOffset = 0;
 
-  final _mediums = [
-    'all',
-    'painting',
-    'sculpture',
-    'photography',
-    'digital',
-    'mixed media',
-  ];
+  // final _mediums = [
+  //   'all',
+  //   'painting',
+  //   'sculpture',
+  //   'photography',
+  //   'digital',
+  //   'mixed media',
+  // ];
 
   @override
   void initState() {
@@ -37,6 +37,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ArtworkProvider>().fetchArtworks(refresh: true);
+      context.read<ArtworkProvider>().fetchMediums(); // <-- ny
     });
   }
 
@@ -213,6 +214,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _buildFilterChips() {
+    final mediums = ['all', ...context.watch<ArtworkProvider>().mediums];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(
@@ -220,12 +222,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
         vertical: AppSpacing.sm,
       ),
       child: Row(
-        children: _mediums.map((m) {
-          final label = m == 'all'
-              ? 'All'
-              : m == 'mixed media'
-                  ? 'Mixed'
-                  : m[0].toUpperCase() + m.substring(1);
+        children: mediums.map((m) {
+          final label = m == 'all' ? 'All' : m;
           return Padding(
             padding: const EdgeInsets.only(right: AppSpacing.xs),
             child: AppChip(
