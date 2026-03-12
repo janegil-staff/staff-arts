@@ -1,8 +1,10 @@
 // lib/screens/auth/register_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import 'legal_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -19,6 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   String _role = 'collector';
   bool _obscure = true;
+  bool _agreedToTerms = false;
 
   @override
   void dispose() {
@@ -31,6 +34,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_agreedToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Please accept the Privacy Policy and Terms of Service'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
     final auth = context.read<AuthProvider>();
     final success = await auth.register(
       name: _nameController.text.trim(),
@@ -43,7 +56,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
     if (!mounted) return;
     if (success) {
-      // Pop all auth screens back to MainShell
       Navigator.of(context).popUntil((route) => route.isFirst);
     } else if (auth.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -151,7 +163,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscure,
-                    textInputAction: TextInputAction.next,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submit(),
                     style: const TextStyle(color: AppColors.text),
                     decoration: InputDecoration(
                       hintText: 'Password',
@@ -189,6 +202,72 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       _roleChip('Gallery', 'gallery'),
                     ],
                   ),
+                  const SizedBox(height: 20),
+
+                  // ── Terms & Privacy checkbox ──────────────────────────
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: _agreedToTerms,
+                          activeColor: AppColors.teal,
+                          side: const BorderSide(color: AppColors.border),
+                          onChanged: (v) =>
+                              setState(() => _agreedToTerms = v ?? false),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            style: const TextStyle(
+                              fontSize: AppFontSize.sm,
+                              color: AppColors.textSecondary,
+                              height: 1.5,
+                            ),
+                            children: [
+                              const TextSpan(text: 'I agree to the '),
+                              TextSpan(
+                                text: 'Privacy Policy',
+                                style: const TextStyle(
+                                  color: AppColors.teal,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const LegalScreen(
+                                              type: LegalType.privacy),
+                                        ),
+                                      ),
+                              ),
+                              const TextSpan(text: ' and '),
+                              TextSpan(
+                                text: 'Terms of Service',
+                                style: const TextStyle(
+                                  color: AppColors.teal,
+                                  decoration: TextDecoration.underline,
+                                ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const LegalScreen(
+                                              type: LegalType.terms),
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,

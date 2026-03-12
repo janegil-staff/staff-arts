@@ -10,6 +10,9 @@ import '../../theme/app_theme.dart';
 import 'edit_profile_screen.dart';
 import '../messages/conversations_screen.dart';
 import '../artwork/saved_artworks_screen.dart';
+import 'my_artworks_screen.dart';
+import '../../services/api_service.dart' show ApiService;
+import '../../config/api_config.dart' show ApiConfig;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -86,6 +89,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ListView(
       padding: const EdgeInsets.only(bottom: 100),
       children: [
+
+
+
         // ── Avatar & Info ────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(
@@ -235,7 +241,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           child: Column(
             children: [
-              _menuItem(context, '🎨', 'My Artworks', null, () {}),
+              _menuItem(context, '🎨', 'My Artworks', null, () {
+                Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute(builder: (_) => const MyArtworksScreen()),
+                );
+              }),
               _divider(),
               _menuItem(context, '🔖', 'Saved Artworks', null, () {
                 Navigator.of(context, rootNavigator: true).push(

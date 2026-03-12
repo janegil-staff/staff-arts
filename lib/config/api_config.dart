@@ -19,13 +19,15 @@ class ApiConfig {
   // Users
   static const String users = '/api/users';
   static String user(String id) => '/api/users/$id';
-  static String userByUsername(String username) => '/api/users/username/$username';
+  static String userByUsername(String username) =>
+      '/api/users/username/$username';
   static String userFollow(String id) => '/api/users/$id/follow';
 
   // Conversations
   static const String conversations = '/api/conversations';
   static const String conversationsUnread = '/api/conversations/unread';
-  static String messages(String convoId) => '/api/conversations/$convoId/messages';
+  static String messages(String convoId) =>
+      '/api/conversations/$convoId/messages';
 
   // Music
   static const String tracks = '/api/music';
@@ -51,4 +53,6 @@ class ApiConfig {
   static const String artworkMediums = '/api/artworks/mediums';
 
   static const String artworksSaved = '/api/artworks/saved';
+
+  static String userArtworks(String id) => '/api/users/$id/artworks';
 }

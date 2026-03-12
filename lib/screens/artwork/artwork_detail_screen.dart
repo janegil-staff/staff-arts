@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import 'package:staff_art/providers/artwork_provider.dart';
 import '../../models/artwork_model.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
@@ -134,6 +135,49 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
       }
     }
     if (mounted) setState(() => _saveLoading = false);
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Delete Artwork',
+            style: TextStyle(color: AppColors.text)),
+        content: Text(
+          'Are you sure you want to delete "${_artwork.title}"? This cannot be undone.',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.textMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child:
+                const Text('Delete', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _api.delete(ApiConfig.artwork(_artwork.id));
+      if (mounted) {
+        context.read<ArtworkProvider>().removeArtwork(_artwork.id);
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to delete: $e'),
+              backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   void _openComments() {
@@ -393,6 +437,33 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                       children: _artwork.tags.map((t) => _tag(t)).toList(),
                     ),
                   ],
+
+                  // ── Delete (owner only) ────────────────────────────────────
+                  Builder(builder: (context) {
+                    final myId = context.read<AuthProvider>().user?.id ?? '';
+                    final artistId = _artwork.artist?.id ?? '';
+                    if (myId.isEmpty || artistId != myId) {
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.xl),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _confirmDelete,
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              color: AppColors.error, size: 18),
+                          label: const Text('Delete Artwork',
+                              style: TextStyle(color: AppColors.error)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                                color: AppColors.error.withValues(alpha: 0.4)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
 
                   const SizedBox(height: AppSpacing.xl),
                 ],

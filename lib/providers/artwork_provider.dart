@@ -15,6 +15,12 @@ class ArtworkProvider extends ChangeNotifier {
   bool _hasMore = true;
 
   List<ArtworkModel> get artworks => _artworks;
+
+  void removeArtwork(String id) {
+    _artworks.removeWhere((a) => a.id == id);
+    _featured.removeWhere((a) => a.id == id);
+    notifyListeners();
+  }
   List<ArtworkModel> get featured => _featured;
   bool get loading => _loading;
   String? get error => _error;
