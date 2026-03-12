@@ -110,6 +110,18 @@ class SocketService {
     _handlers.clear();
   }
 
+  void joinUserRoom(String userId) {
+    _socket?.emit('join_user_room', userId);
+  }
+
+  void onFollowUpdate(void Function(Map<String, dynamic> data) callback) {
+    _socket?.on('follow_update', (data) => callback(data));
+  }
+
+  void removeFollowListener() {
+    _socket?.off('follow_update');
+  }
+
   void joinConversation(String conversationId) {
     _socket?.emit('join_conversation', conversationId);
   }

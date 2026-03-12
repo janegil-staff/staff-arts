@@ -99,6 +99,19 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Called when a socket follow_update event is received
+  void updateFollowerCount(int count) {
+    if (_user == null) return;
+    _user = _user!.copyWith(followerCount: count);
+    notifyListeners();
+  }
+
+  /// Optimistically update any user field locally
+  void updateUserLocally(UserModel updated) {
+    _user = updated;
+    notifyListeners();
+  }
+
   String _parseError(dynamic e) {
     if (e is DioException) {
       final data = e.response?.data;

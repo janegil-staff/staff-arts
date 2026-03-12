@@ -25,12 +25,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _fetchUnread();
-    _startSocketListener();
+    _startMessageListener();
+    _startFollowListener();
   }
 
   @override
   void dispose() {
     SocketService().removeMessageListener('__profile__');
+    SocketService().removeFollowListener();
     super.dispose();
   }
 
@@ -47,7 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (_) {}
   }
 
-  void _startSocketListener() async {
+  void _startMessageListener() async {
     final socket = SocketService();
     await socket.connect();
     socket.addMessageListener('__profile__', (msg) {
@@ -61,6 +63,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
+  void _startFollowListener() async {
+    final socket = SocketService();
+    await socket.connect();
+    if (!mounted) return;
+    final myId = context.read<AuthProvider>().user?.id ?? '';
+    if (myId.isEmpty) return;
+    socket.joinUserRoom(myId);
+    socket.onFollowUpdate((data) {
+      if (!mounted) return;
+      final count = data['followerCount'] as int? ?? 0;
+      context.read<AuthProvider>().updateFollowerCount(count);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
@@ -69,7 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ListView(
       padding: const EdgeInsets.only(bottom: 100),
       children: [
-        // ── Avatar & Info ──
+        // ── Avatar & Info ────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(
             vertical: AppSpacing.xl,
@@ -172,7 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
 
-        // ── Stats Bar ──
+        // ── Stats Bar ────────────────────────────────────────────────────
         Container(
           margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
@@ -190,16 +206,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
 
-        // ── Edit Profile Button ──
+        // ── Edit Profile ─────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.lg,
             vertical: AppSpacing.md,
           ),
           child: OutlinedButton(
-            onPressed: () => Navigator.of(context, rootNavigator: true).push(
-              MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-            ),
+            onPressed: () => Navigator.of(context, rootNavigator: true)
+                .push(MaterialPageRoute(
+                    builder: (_) => const EditProfileScreen()))
+                .then((_) => context.read<AuthProvider>().refreshUser()),
             child: const Text(
               'Edit Profile',
               style: TextStyle(fontSize: AppFontSize.md),
@@ -207,7 +224,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
 
-        // ── Menu Items ──
+        // ── Menu Items ───────────────────────────────────────────────────
         Container(
           margin: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           decoration: BoxDecoration(
@@ -223,23 +240,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _divider(),
               _menuItem(context, '✏️', 'Commissions', null, () {}),
               _divider(),
-              _menuItem(context, '💬', 'Messages',
-                  _unreadCount > 0 ? _unreadCount : null, () {
-                setState(() => _unreadCount = 0);
-                Navigator.of(context, rootNavigator: true)
-                    .push(
-                      MaterialPageRoute(
-                          builder: (_) => const ConversationsScreen()),
-                    )
-                    .then((_) => _fetchUnread());
-              }),
+              _menuItem(
+                context,
+                '💬',
+                'Messages',
+                _unreadCount > 0 ? _unreadCount : null,
+                () {
+                  setState(() => _unreadCount = 0);
+                  Navigator.of(context, rootNavigator: true)
+                      .push(MaterialPageRoute(
+                          builder: (_) => const ConversationsScreen()))
+                      .then((_) => _fetchUnread());
+                },
+              ),
               _divider(),
               _menuItem(context, '⚙️', 'Settings', null, () {}),
             ],
           ),
         ),
 
-        // ── Sign Out ──
+        // ── Sign Out ─────────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.lg,
@@ -270,15 +290,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
             : null,
         child: Column(
           children: [
-            Text('$count',
-                style: const TextStyle(
-                    fontSize: AppFontSize.xl,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.text)),
+            Text(
+              '$count',
+              style: const TextStyle(
+                  fontSize: AppFontSize.xl,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.text),
+            ),
             const SizedBox(height: 2),
-            Text(label,
-                style: const TextStyle(
-                    fontSize: AppFontSize.xs, color: AppColors.textMuted)),
+            Text(
+              label,
+              style: const TextStyle(
+                  fontSize: AppFontSize.xs, color: AppColors.textMuted),
+            ),
           ],
         ),
       ),

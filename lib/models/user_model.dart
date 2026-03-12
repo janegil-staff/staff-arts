@@ -73,4 +73,53 @@ class UserModel {
   }
 
   String get displayLabel => displayName ?? username ?? name ?? email;
+
+  UserModel copyWith({
+    String? id,
+    String? email,
+    String? name,
+    String? displayName,
+    String? username,
+    String? slug,
+    String? role,
+    String? avatar,
+    String? coverImage,
+    String? bio,
+    String? location,
+    String? website,
+    bool? verified,
+    Map<String, String>? socialLinks,
+    List<String>? mediums,
+    List<String>? styles,
+    bool? isAvailableForCommission,
+    int? followerCount,
+    int? followingCount,
+    int? artworkCount,
+    bool? isFeatured,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      displayName: displayName ?? this.displayName,
+      username: username ?? this.username,
+      slug: slug ?? this.slug,
+      role: role ?? this.role,
+      avatar: avatar ?? this.avatar,
+      coverImage: coverImage ?? this.coverImage,
+      bio: bio ?? this.bio,
+      location: location ?? this.location,
+      website: website ?? this.website,
+      verified: verified ?? this.verified,
+      socialLinks: socialLinks ?? this.socialLinks,
+      mediums: mediums ?? this.mediums,
+      styles: styles ?? this.styles,
+      isAvailableForCommission:
+          isAvailableForCommission ?? this.isAvailableForCommission,
+      followerCount: followerCount ?? this.followerCount,
+      followingCount: followingCount ?? this.followingCount,
+      artworkCount: artworkCount ?? this.artworkCount,
+      isFeatured: isFeatured ?? this.isFeatured,
+    );
+  }
 }
