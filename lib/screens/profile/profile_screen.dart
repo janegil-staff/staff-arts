@@ -252,10 +252,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
               }),
               _divider(),
-              _menuItem(context, '📦', 'Orders', null, () {}),
-              _divider(),
-              _menuItem(context, '✏️', 'Commissions', null, () {}),
-              _divider(),
               _menuItem(
                 context,
                 '💬',

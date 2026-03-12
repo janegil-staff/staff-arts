@@ -11,12 +11,14 @@ class ChatScreen extends StatefulWidget {
   final String? conversationId;
   final String name;
   final String? participantId;
+  final String? initialMessage;
 
   const ChatScreen({
     super.key,
     this.conversationId,
     required this.name,
     this.participantId,
+    this.initialMessage,
   });
 
   @override
@@ -37,6 +39,9 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _convoId = widget.conversationId;
+    if (widget.initialMessage != null) {
+      _controller.text = widget.initialMessage!;
+    }
     _initChat();
   }
 
@@ -57,15 +62,13 @@ class _ChatScreenState extends State<ChatScreen> {
     if (senderId == myId) return;
     if (mounted) {
       setState(() => _messages.add(msg));
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _scrollToBottom()); // <-- fix
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
     }
   }
 
   @override
   void dispose() {
     if (_convoId != null) {
-      // Don't leave the room — stay joined so badge keeps updating
       _socket.removeMessageListener('__convo_${_convoId!}');
     }
     _controller.dispose();
@@ -106,7 +109,6 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _sending = true);
 
     try {
-      // If no conversation yet, create one first
       if (_convoId == null && widget.participantId != null) {
         final convoRes = await _api.post(ApiConfig.conversations, data: {
           'participantId': widget.participantId,
@@ -120,7 +122,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (_convoId == null) return;
 
-      // Optimistically add message to UI
       final myUser = context.read<AuthProvider>().user;
       final optimistic = {
         '_id': 'temp_${DateTime.now().millisecondsSinceEpoch}',
@@ -136,19 +137,16 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() => _messages.add(optimistic));
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
-      // Send to server
       final res =
           await _api.post(ApiConfig.messages(_convoId!), data: {'text': text});
       final sent = res.data['data'] as Map<String, dynamic>;
 
-      // Replace optimistic with real message
       setState(() {
         final idx = _messages.indexWhere((m) => m['_id'] == optimistic['_id']);
         if (idx != -1) _messages[idx] = sent;
       });
     } catch (e) {
       debugPrint('Chat send error: $e');
-      // Remove optimistic on failure
       setState(() => _messages.removeWhere(
           (m) => m['_id']?.toString().startsWith('temp_') == true));
     }
@@ -189,7 +187,6 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       body: Column(children: [
-        // Messages
         Expanded(
           child: _loading
               ? const Center(
@@ -212,8 +209,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       },
                     ),
         ),
-
-        // Input bar
         Container(
           padding: EdgeInsets.only(
               left: 12,

@@ -2,14 +2,16 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
-import 'package:staff_art/providers/artwork_provider.dart';
 import '../../models/artwork_model.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/artwork_provider.dart';
 import '../../providers/tab_provider.dart';
 import '../../services/api_service.dart';
 import '../../config/api_config.dart';
 import '../profile/artist_profile_screen.dart';
+import '../messages/chat_screen.dart';
+import '../auth/login_screen.dart';
 
 String _currencySymbol(String code) {
   const symbols = {
@@ -49,7 +51,6 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
     _fetchFresh();
   }
 
-  // Fetch fresh artwork from backend so views, isLiked, isSaved are current
   Future<void> _fetchFresh() async {
     setState(() => _refreshing = true);
     try {
@@ -85,7 +86,6 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
     if (_likeLoading) return;
     setState(() => _likeLoading = true);
     final wasLiked = _artwork.isLiked;
-    // Optimistic update
     setState(() {
       _artwork = _artwork.copyWith(
         isLiked: !wasLiked,
@@ -96,7 +96,6 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
     try {
       await _api.post(ApiConfig.artworkLike(_artwork.id));
     } catch (_) {
-      // Revert on failure
       if (mounted) {
         setState(() {
           _artwork = _artwork.copyWith(
@@ -135,6 +134,45 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
       }
     }
     if (mounted) setState(() => _saveLoading = false);
+  }
+
+  Future<void> _contactArtist() async {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) {
+      Navigator.push(
+          context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+      return;
+    }
+    final artistId = _artwork.artist?.id;
+    if (artistId == null) return;
+
+    try {
+      final res = await _api
+          .post(ApiConfig.conversations, data: {'participantId': artistId});
+      final convo = res.data['data'] as Map<String, dynamic>;
+      final convoId = convo['_id']?.toString() ?? '';
+      final artistName = _artwork.artist!.displayLabel;
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(
+            conversationId: convoId,
+            name: artistName,
+            initialMessage:
+                'Hi, I\'m interested in purchasing "${_artwork.title}". Is it still available?',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Could not open chat: $e'),
+              backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   Future<void> _confirmDelete() async {
@@ -189,10 +227,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (_) => _CommentsSheet(artworkId: _artwork.id),
-    ).then((_) {
-      // Refresh comment count after sheet closes
-      _fetchFresh();
-    });
+    ).then((_) => _fetchFresh());
   }
 
   @override
@@ -221,7 +256,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Image carousel ──────────────────────────────────────────────
+            // ── Image carousel ─────────────────────────────────────────────
             Stack(
               children: [
                 SizedBox(
@@ -269,7 +304,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Title ──────────────────────────────────────────────────
+                  // ── Title ─────────────────────────────────────────────────
                   Text(
                     _artwork.title,
                     style: const TextStyle(
@@ -278,7 +313,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                         color: AppColors.text),
                   ),
 
-                  // ── Year ───────────────────────────────────────────────────
+                  // ── Year ──────────────────────────────────────────────────
                   if (_artwork.year != null) ...[
                     const SizedBox(height: 4),
                     Text(
@@ -290,7 +325,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                     ),
                   ],
 
-                  // ── Artist ─────────────────────────────────────────────────
+                  // ── Artist ────────────────────────────────────────────────
                   if (_artwork.artist != null) ...[
                     const SizedBox(height: AppSpacing.md),
                     GestureDetector(
@@ -331,7 +366,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
 
                   const SizedBox(height: AppSpacing.lg),
 
-                  // ── Engagement row ─────────────────────────────────────────
+                  // ── Engagement row ────────────────────────────────────────
                   Row(
                     children: [
                       _EngagementButton(
@@ -374,7 +409,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                     ],
                   ),
 
-                  // ── Price ──────────────────────────────────────────────────
+                  // ── Price ─────────────────────────────────────────────────
                   if (_artwork.forSale) ...[
                     const SizedBox(height: AppSpacing.lg),
                     Container(
@@ -392,7 +427,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                         ),
                         const Spacer(),
                         ElevatedButton(
-                          onPressed: () {},
+                          onPressed: _contactArtist,
                           style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 24, vertical: 12)),
@@ -402,7 +437,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                     ),
                   ],
 
-                  // ── Description ────────────────────────────────────────────
+                  // ── Description ───────────────────────────────────────────
                   if (_artwork.description.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.lg),
                     Text(
@@ -414,7 +449,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                     ),
                   ],
 
-                  // ── Details ────────────────────────────────────────────────
+                  // ── Details ───────────────────────────────────────────────
                   const SizedBox(height: AppSpacing.lg),
                   const Divider(color: AppColors.borderLight),
                   const SizedBox(height: AppSpacing.md),
@@ -428,7 +463,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                   const SizedBox(height: AppSpacing.md),
                   _buildDetailsGrid(_artwork),
 
-                  // ── Tags ───────────────────────────────────────────────────
+                  // ── Tags ──────────────────────────────────────────────────
                   if (_artwork.tags.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.lg),
                     Wrap(
@@ -438,7 +473,7 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                     ),
                   ],
 
-                  // ── Delete (owner only) ────────────────────────────────────
+                  // ── Delete (owner only) ───────────────────────────────────
                   Builder(builder: (context) {
                     final myId = context.read<AuthProvider>().user?.id ?? '';
                     final artistId = _artwork.artist?.id ?? '';
