@@ -1,7 +1,6 @@
 // lib/models/artwork_model.dart
 
 // ─── ArtworkArtist ────────────────────────────────────────────────────────────
-// Typed artist object so widgets can use .name, .displayName, .avatar directly
 
 class ArtworkArtist {
   final String id;
@@ -181,10 +180,89 @@ class ArtworkModel {
     this.updatedAt,
   });
 
-  // Both getters so widgets can use either
   String get mainImageUrl => images.isNotEmpty ? images.first.url : '';
   String get thumbnailUrl => mainImageUrl;
   String get blurHash => images.isNotEmpty ? (images.first.blurUrl ?? '') : '';
+
+  ArtworkModel copyWith({
+    String? id,
+    String? artistId,
+    ArtworkArtist? artist,
+    String? title,
+    String? description,
+    List<ArtworkImage>? images,
+    String? medium,
+    String? style,
+    String? subject,
+    List<String>? materials,
+    List<String>? categories,
+    List<String>? tags,
+    List<String>? aiTags,
+    String? aiDescription,
+    String? mood,
+    List<String>? dominantColors,
+    ArtworkDimensions? dimensions,
+    int? year,
+    String? edition,
+    bool? forSale,
+    double? price,
+    String? currency,
+    bool? isOriginal,
+    bool? isPrint,
+    bool? isDigital,
+    String? shippingInfo,
+    int? views,
+    int? likesCount,
+    int? savesCount,
+    int? commentsCount,
+    bool? isLiked,
+    bool? isSaved,
+    String? status,
+    bool? isFeatured,
+    String? exhibitionId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return ArtworkModel(
+      id: id ?? this.id,
+      artistId: artistId ?? this.artistId,
+      artist: artist ?? this.artist,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      images: images ?? this.images,
+      medium: medium ?? this.medium,
+      style: style ?? this.style,
+      subject: subject ?? this.subject,
+      materials: materials ?? this.materials,
+      categories: categories ?? this.categories,
+      tags: tags ?? this.tags,
+      aiTags: aiTags ?? this.aiTags,
+      aiDescription: aiDescription ?? this.aiDescription,
+      mood: mood ?? this.mood,
+      dominantColors: dominantColors ?? this.dominantColors,
+      dimensions: dimensions ?? this.dimensions,
+      year: year ?? this.year,
+      edition: edition ?? this.edition,
+      forSale: forSale ?? this.forSale,
+      price: price ?? this.price,
+      currency: currency ?? this.currency,
+      isOriginal: isOriginal ?? this.isOriginal,
+      isPrint: isPrint ?? this.isPrint,
+      isDigital: isDigital ?? this.isDigital,
+      shippingInfo: shippingInfo ?? this.shippingInfo,
+      views: views ?? this.views,
+      likesCount: likesCount ?? this.likesCount,
+      savesCount: savesCount ?? this.savesCount,
+      commentsCount: commentsCount ?? this.commentsCount,
+      isLiked: isLiked ?? this.isLiked,
+      isSaved: isSaved ?? this.isSaved,
+      status: status ?? this.status,
+      isFeatured: isFeatured ?? this.isFeatured,
+      exhibitionId: exhibitionId ?? this.exhibitionId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 
   factory ArtworkModel.fromJson(Map<String, dynamic> json) {
     final artistRaw = json['artist'];
