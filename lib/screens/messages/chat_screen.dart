@@ -54,11 +54,11 @@ class _ChatScreenState extends State<ChatScreen> {
   void _onSocketMessage(Map<String, dynamic> msg) {
     final myId = context.read<AuthProvider>().user?.id ?? '';
     final senderId = _extractSenderId(msg);
-    // Don't add duplicate — our own messages are already added optimistically
     if (senderId == myId) return;
     if (mounted) {
       setState(() => _messages.add(msg));
-      _scrollToBottom();
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _scrollToBottom()); // <-- fix
     }
   }
 
