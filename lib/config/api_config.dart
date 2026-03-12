@@ -49,4 +49,6 @@ class ApiConfig {
   static const String exchangeRates = '/api/exchange-rates';
 
   static const String artworkMediums = '/api/artworks/mediums';
+
+  static const String artworksSaved = '/api/artworks/saved';
 }

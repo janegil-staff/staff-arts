@@ -9,6 +9,7 @@ import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
 import 'edit_profile_screen.dart';
 import '../messages/conversations_screen.dart';
+import '../artwork/saved_artworks_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -235,6 +236,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: Column(
             children: [
               _menuItem(context, '🎨', 'My Artworks', null, () {}),
+              _divider(),
+              _menuItem(context, '🔖', 'Saved Artworks', null, () {
+                Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute(
+                      builder: (_) => const SavedArtworksScreen()),
+                );
+              }),
               _divider(),
               _menuItem(context, '📦', 'Orders', null, () {}),
               _divider(),
