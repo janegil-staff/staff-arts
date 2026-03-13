@@ -410,7 +410,10 @@ class _ArtworkDetailScreenState extends State<ArtworkDetailScreen> {
                   ),
 
                   // ── Price ─────────────────────────────────────────────────
-                  if (_artwork.forSale) ...[
+                  // ── Price ─────────────────────────────────────────────────
+                  if (_artwork.forSale &&
+                      (context.read<AuthProvider>().user?.id !=
+                          _artwork.artist?.id)) ...[
                     const SizedBox(height: AppSpacing.lg),
                     Container(
                       padding: const EdgeInsets.all(AppSpacing.lg),
