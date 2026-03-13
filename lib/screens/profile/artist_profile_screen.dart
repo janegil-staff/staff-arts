@@ -9,6 +9,7 @@ import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/artwork_card.dart';
 import '../../providers/auth_provider.dart';
+import '../auth/login_screen.dart';
 import '../artwork/artwork_detail_screen.dart';
 import '../messages/chat_screen.dart';
 
@@ -106,6 +107,17 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
     } catch (e) {
       debugPrint('Open chat error: $e');
     }
+  }
+
+  void _requireLogin(VoidCallback action) {
+    final isLoggedIn = context.read<AuthProvider>().isAuthenticated;
+    if (!isLoggedIn) {
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
+      return;
+    }
+    action();
   }
 
   bool get _isOwnProfile {
@@ -311,18 +323,18 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
                             )
                           : _isFollowing
                               ? OutlinedButton(
-                                  onPressed: _toggleFollow,
+                                  onPressed: () => _requireLogin(_toggleFollow),
                                   child: const Text('Following'),
                                 )
                               : ElevatedButton(
-                                  onPressed: _toggleFollow,
+                                  onPressed: () => _requireLogin(_toggleFollow),
                                   child: const Text('Follow'),
                                 ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: _openChat,
+                        onPressed: () => _requireLogin(_openChat),
                         child: const Text('Message'),
                       ),
                     ),
@@ -367,12 +379,12 @@ class _ArtistProfileScreenState extends State<ArtistProfileScreen> {
               ),
             ),
           ] else if (!_loading) ...[
-            Center(
+            const Center(
               child: Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.xl),
+                padding: EdgeInsets.only(top: AppSpacing.xl),
                 child: Text(
                   'No artworks yet',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: AppFontSize.sm, color: AppColors.textMuted),
                 ),
               ),
