@@ -55,4 +55,6 @@ class ApiConfig {
   static const String artworksSaved = '/api/artworks/saved';
 
   static String userArtworks(String id) => '/api/users/$id/artworks';
+
+  static const String forgotPassword = '/api/mobile/auth/forgot-password';
 }

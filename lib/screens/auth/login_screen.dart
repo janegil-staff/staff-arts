@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,7 +35,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
     if (!mounted) return;
     if (success) {
-      // Pop back to MainShell — it already reacts to auth state
       Navigator.of(context).popUntil((route) => route.isFirst);
     } else if (auth.error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -108,10 +108,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: AppColors.text),
                     decoration: const InputDecoration(
                       hintText: "Email",
-                      prefixIcon: Icon(Icons.email_outlined, color: AppColors.textMuted),
+                      prefixIcon: Icon(Icons.email_outlined,
+                          color: AppColors.textMuted),
                     ),
-                    validator: (v) =>
-                        v != null && v.contains("@") ? null : "Enter a valid email",
+                    validator: (v) => v != null && v.contains("@")
+                        ? null
+                        : "Enter a valid email",
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -122,7 +124,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: const TextStyle(color: AppColors.text),
                     decoration: InputDecoration(
                       hintText: "Password",
-                      prefixIcon: const Icon(Icons.lock_outlined, color: AppColors.textMuted),
+                      prefixIcon: const Icon(Icons.lock_outlined,
+                          color: AppColors.textMuted),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscure ? Icons.visibility_off : Icons.visibility,
@@ -134,7 +137,32 @@ class _LoginScreenState extends State<LoginScreen> {
                     validator: (v) =>
                         v != null && v.length >= 8 ? null : "Min 8 characters",
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 8),
+
+                  // Forgot password link
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ForgotPasswordScreen()),
+                      ),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        "Forgot password?",
+                        style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: AppFontSize.sm),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
