@@ -1,0 +1,5 @@
+
+storePassword=fooBar83
+keyPassword=fooBar83
+keyAlias=upload
+storeFile=/Users/janegil-staff/upload-keystore.jks
