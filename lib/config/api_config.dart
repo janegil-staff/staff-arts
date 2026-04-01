@@ -1,7 +1,7 @@
 // lib/config/api_config.dart
 class ApiConfig {
-  static const String baseUrl = 'https://staff-arts-api.onrender.com/';
-  static const String androidEmulatorUrl = 'https://staff-arts-api.onrender.com/';
+  static const String baseUrl = 'https://staffarts-app-api-o4hbf.ondigitalocean.app';
+  static const String androidEmulatorUrl = 'https://staffarts-app-api-o4hbf.ondigitalocean.app/';
 
   // Auth
   static const String login = '/api/mobile/auth/login';
