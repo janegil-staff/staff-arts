@@ -1,4 +1,5 @@
 // lib/services/api_service.dart
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -7,6 +8,11 @@ import '../config/api_config.dart';
 class ApiService {
   late final Dio _dio;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  /// If a refresh is currently in flight, all other 401-triggered refresh
+  /// attempts await this future instead of firing their own request.
+  /// This prevents the "rotated-token race" that 401s the loser requests.
+  Future<bool>? _refreshInFlight;
 
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
@@ -23,9 +29,12 @@ class ApiService {
 
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await _storage.read(key: "token");
-        if (token != null) {
-          options.headers["Authorization"] = "Bearer $token";
+        // Don't attach the (possibly expired) access token to the refresh call.
+        if (options.path != ApiConfig.refreshToken) {
+          final token = await _storage.read(key: "token");
+          if (token != null) {
+            options.headers["Authorization"] = "Bearer $token";
+          }
         }
         // Let Dio set the correct Content-Type for FormData (multipart)
         if (options.data is FormData) {
@@ -36,11 +45,14 @@ class ApiService {
       onError: (error, handler) async {
         final isRefreshCall =
             error.requestOptions.path == ApiConfig.refreshToken;
+
         if (error.response?.statusCode == 401 &&
             !isRefreshCall &&
             error.requestOptions.extra["retried"] != true) {
           error.requestOptions.extra["retried"] = true;
-          final refreshed = await _tryRefresh();
+
+          final refreshed = await _coalescedRefresh();
+
           if (refreshed) {
             final token = await _storage.read(key: "token");
             error.requestOptions.headers["Authorization"] = "Bearer $token";
@@ -53,6 +65,20 @@ class ApiService {
         handler.next(error);
       },
     ));
+  }
+
+  /// Coalesces concurrent refresh attempts into a single request.
+  /// If a refresh is already running, awaits its result instead of starting
+  /// another (which would 401 because the refresh token was just rotated).
+  Future<bool> _coalescedRefresh() {
+    final existing = _refreshInFlight;
+    if (existing != null) return existing;
+
+    final future = _tryRefresh().whenComplete(() {
+      _refreshInFlight = null;
+    });
+    _refreshInFlight = future;
+    return future;
   }
 
   Future<bool> _tryRefresh() async {
@@ -70,7 +96,11 @@ class ApiService {
         );
         return true;
       }
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) {
+        print('🔴 REFRESH FAILED: $e');
+      }
+    }
     return false;
   }
 
